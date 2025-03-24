@@ -297,56 +297,113 @@
       scoreTexture.needsUpdate = true;
     }
     
-    // Función modificada para generar operaciones combinadas
+    // Función para generar una expresión con 4 números, paréntesis y operaciones de +, -, *, /
+    // Se utiliza el patrón: (a op1 b) op2 (c op3 d)
+    // Se asegura que en cada operación el resultado sea exacto (división entera) y no se generen negativos.
     function generateQuestion() {
-  // Generar cuatro operandos aleatorios entre 1 y 10
-  const a = Math.floor(Math.random() * 10) + 1;
-  const b = Math.floor(Math.random() * 10) + 1;
-  const c = Math.floor(Math.random() * 10) + 1;
-  const d = Math.floor(Math.random() * 10) + 1;
-  
-  // Operadores disponibles: suma, resta, multiplicación y división
-  const ops = ["+", "-", "*", "/"];
-  const op1 = ops[Math.floor(Math.random() * ops.length)];
-  const op2 = ops[Math.floor(Math.random() * ops.length)];
-  const op3 = ops[Math.floor(Math.random() * ops.length)];
-  
-  // Definir varios patrones de paréntesis
-  const patterns = [
-    `(( ${a} ${op1} ${b} ) ${op2} ${c}) ${op3} ${d}`,
-    `( ${a} ${op1} ( ${b} ${op2} ${c} )) ${op3} ${d}`,
-    `( ${a} ${op1} ${b} ) ${op2} ( ${c} ${op3} ${d} )`,
-    `${a} ${op1} (( ${b} ${op2} ${c} ) ${op3} ${d})`,
-    `${a} ${op1} ( ${b} ${op2} ( ${c} ${op3} ${d} ))`
-  ];
-  
-  // Seleccionar un patrón al azar
-  const patternIndex = Math.floor(Math.random() * patterns.length);
-  const calcExpression = patterns[patternIndex];
-  
-  try {
-    correctAnswer = eval(calcExpression);
-  } catch (e) {
-    // En caso de error (por ejemplo, división por cero), vuelve a generar la pregunta
-    generateQuestion();
-    return;
-  }
-  
-  // Para la visualización, se reemplazan los símbolos "*" y "/" por "x" y "÷"
-  let displayExpression = calcExpression.replace(/\*/g, "x").replace(/\//g, "÷");
-  questionText = `¿Cuánto es ${displayExpression}?`;
-  
-  if (questionMesh) {
-    scene.remove(questionMesh);
-    questionMesh = null;
-  }
-  updateQuestionPanel();
-  updateAnswerObjects();
-  beepPlayed = false;
-}
-
+      let a, b, c, d;
+      let op1, op2, op3;
+      let left, right;
+      let valid = false;
+      let attempts = 0;
+      // Se realizan intentos hasta generar una expresión válida
+      while (!valid && attempts < 100) {
+        attempts++;
+        // Para el primer paréntesis: (a op1 b)
+        b = Math.floor(Math.random() * 10) + 1;
+        op1 = ["+", "-", "*", "/"][Math.floor(Math.random() * 4)];
+        if(op1 === "-"){
+          // para que no dé negativo, a debe ser mayor o igual que b
+          a = Math.floor(Math.random() * (10 - b + 1)) + b;
+        } else if(op1 === "/"){
+          // para división exacta, elegimos un cociente entre 1 y 10
+          const q = Math.floor(Math.random() * 10) + 1;
+          a = b * q;
+          if(a > 10) continue; // asegurar operandos pequeños
+        } else {
+          a = Math.floor(Math.random() * 10) + 1;
+        }
+        // Calcular parte izquierda
+        switch(op1) {
+          case "+": left = a + b; break;
+          case "-": left = a - b; break;
+          case "*": left = a * b; break;
+          case "/": 
+            if(b === 0) continue;
+            left = a / b; 
+            break;
+        }
+        
+        // Para el segundo paréntesis: (c op3 d)
+        d = Math.floor(Math.random() * 10) + 1;
+        op3 = ["+", "-", "*", "/"][Math.floor(Math.random() * 4)];
+        if(op3 === "-"){
+          c = Math.floor(Math.random() * (10 - d + 1)) + d;
+        } else if(op3 === "/"){
+          const q = Math.floor(Math.random() * 10) + 1;
+          c = d * q;
+          if(c > 10) continue;
+        } else {
+          c = Math.floor(Math.random() * 10) + 1;
+        }
+        // Calcular parte derecha
+        switch(op3) {
+          case "+": right = c + d; break;
+          case "-": right = c - d; break;
+          case "*": right = c * d; break;
+          case "/": 
+            if(d === 0) continue;
+            right = c / d; 
+            break;
+        }
+        
+        // Para el operador central
+        op2 = ["+", "-", "*", "/"][Math.floor(Math.random() * 4)];
+        // Si es resta, aseguramos que la parte izquierda sea mayor o igual que la derecha; si no, intercambiamos las partes para el cálculo
+        if(op2 === "-" && left < right) {
+          [left, right] = [right, left];
+          // También se intercambian las expresiones de texto correspondientes
+          const tempA = a, tempB = b;
+          a = c; b = d;
+          op1 = op3;
+        }
+        // Si es división, nos aseguramos de que right no sea 0 y que left sea divisible por right
+        if(op2 === "/") {
+          if(right === 0 || left % right !== 0) continue;
+        }
+        // Calcular resultado final
+        let result;
+        switch(op2) {
+          case "+": result = left + right; break;
+          case "-": result = left - right; break;
+          case "*": result = left * right; break;
+          case "/": result = left / right; break;
+        }
+        // Si el resultado es negativo o no entero, descartamos
+        if(result < 0 || !Number.isInteger(result)) continue;
+        correctAnswer = result;
+        // Preparar la cadena de la pregunta con paréntesis y cambiando el símbolo "/" por "÷" y "*" por "x"
+        const dispOp1 = (op1 === "*") ? "x" : (op1 === "/" ? "÷" : op1);
+        const dispOp2 = (op2 === "*") ? "x" : (op2 === "/" ? "÷" : op2);
+        const dispOp3 = (op3 === "*") ? "x" : (op3 === "/" ? "÷" : op3);
+        questionText = `¿Cuánto es (${a} ${dispOp1} ${b}) ${dispOp2} (${c} ${dispOp3} ${d})?`;
+        valid = true;
+      }
+      if(!valid) {
+        // Si no se pudo generar tras varios intentos, se fija una operación por defecto
+        correctAnswer = 10;
+        questionText = "¿Cuánto es (2 + 2) x (3 + 2)?";
+      }
+      if (questionMesh) {
+        scene.remove(questionMesh);
+        questionMesh = null;
+      }
+      updateQuestionPanel();
+      updateAnswerObjects();
+      beepPlayed = false;
+    }
     
-    // Función para actualizar el panel de pregunta con mayor resolución
+    // Se ha reducido el tamaño de fuente para que la pregunta larga quepa en el recuadro azul
     function updateQuestionPanel() {
       const canvas = document.createElement('canvas');
       canvas.width = 512 * resolutionFactor;
@@ -358,7 +415,7 @@
       ctx.fillStyle = "#007BFF";
       drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
       ctx.shadowBlur = 0;
-      ctx.font = 'Bold ' + (48 * resolutionFactor) + 'px Arial';
+      ctx.font = 'Bold ' + (36 * resolutionFactor) + 'px Arial';
       ctx.fillStyle = "#FFFFFF";
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -379,6 +436,7 @@
     }
     
     // Función para crear los paneles de respuestas con mayor resolución
+    // Se modificó la generación de respuestas incorrectas para que sean cercanas al resultado correcto
     function createAnswerObjects(numAnswers, initialCreation) {
       if (initialCreation) {
         const minArc = 1.39626;
@@ -412,10 +470,13 @@
             ctx.fillStyle = "#FFFFFF";
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            // Generar respuestas incorrectas como variaciones cercanas al resultado correcto
             const wrongAnswers = new Set();
             while (wrongAnswers.size < (numAnswers - 1)) {
-              let wrong = Math.floor(Math.random() * 100) + 1;
-              if (wrong !== correctAnswer) wrongAnswers.add(wrong);
+              let delta = Math.floor(Math.random() * 7) - 3; // variación entre -3 y 3
+              if(delta === 0) continue;
+              let wrong = correctAnswer + delta;
+              if(wrong > 0 && wrong !== correctAnswer) wrongAnswers.add(wrong);
             }
             const answersArray = [correctAnswer, ...wrongAnswers];
             answersArray.sort(() => Math.random() - 0.5);
@@ -459,9 +520,11 @@
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             const wrongAnswers = new Set();
-            while (wrongAnswers.size < (numAnswers - 1)) {
-              let wrong = Math.floor(Math.random() * 100) + 1;
-              if (wrong !== correctAnswer) wrongAnswers.add(wrong);
+            while (wrongAnswers.size < (selectedNumAnswers - 1)) {
+              let delta = Math.floor(Math.random() * 7) - 3;
+              if(delta === 0) continue;
+              let wrong = correctAnswer + delta;
+              if(wrong > 0 && wrong !== correctAnswer) wrongAnswers.add(wrong);
             }
             const answersArray = [correctAnswer, ...wrongAnswers];
             answersArray.sort(() => Math.random() - 0.5);
@@ -483,8 +546,10 @@
         const numAnswersExisting = selectedNumAnswers;
         const wrongAnswers = new Set();
         while (wrongAnswers.size < (numAnswersExisting - 1)) {
-          let wrong = Math.floor(Math.random() * 100) + 1;
-          if (wrong !== correctAnswer) wrongAnswers.add(wrong);
+          let delta = Math.floor(Math.random() * 7) - 3;
+          if(delta === 0) continue;
+          let wrong = correctAnswer + delta;
+          if(wrong > 0 && wrong !== correctAnswer) wrongAnswers.add(wrong);
         }
         const answersArray = [correctAnswer, ...wrongAnswers];
         answersArray.sort(() => Math.random() - 0.5);
@@ -670,7 +735,7 @@
       if (scoreMesh) scene.remove(scoreMesh);
       answers.forEach(panel => scene.remove(panel));
       
-      // Cuadro final de resultados con mayor resolución (solo se muestra el cuadro azul)
+      // Cuadro final de resultados con mayor resolución (solo se muestra el recuadro azul)
       const gameOverCanvas = document.createElement('canvas');
       gameOverCanvas.width = 256 * resolutionFactor;
       gameOverCanvas.height = 128 * resolutionFactor;
