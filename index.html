@@ -299,29 +299,52 @@
     
     // Función modificada para generar operaciones combinadas
     function generateQuestion() {
-      // Generar tres operandos aleatorios entre 1 y 10
-      const a = Math.floor(Math.random() * 10) + 1;
-      const b = Math.floor(Math.random() * 10) + 1;
-      const c = Math.floor(Math.random() * 10) + 1;
-      // Operadores disponibles: suma, resta y multiplicación
-      const ops = ["+", "-", "*"];
-      const op1 = ops[Math.floor(Math.random() * ops.length)];
-      const op2 = ops[Math.floor(Math.random() * ops.length)];
-      // Construir la expresión para cálculo (multiplicación con "*" y respetando la jerarquía de operaciones)
-      const calcExpression = `${a} ${op1} ${b} ${op2} ${c}`;
-      correctAnswer = eval(calcExpression);
-      // Para mostrar, se reemplaza el "*" por "x"
-      const displayOp1 = op1 === "*" ? "x" : op1;
-      const displayOp2 = op2 === "*" ? "x" : op2;
-      questionText = `¿Cuánto es ${a} ${displayOp1} ${b} ${displayOp2} ${c}?`;
-      if (questionMesh) {
-        scene.remove(questionMesh);
-        questionMesh = null;
-      }
-      updateQuestionPanel();
-      updateAnswerObjects();
-      beepPlayed = false;
-    }
+  // Generar cuatro operandos aleatorios entre 1 y 10
+  const a = Math.floor(Math.random() * 10) + 1;
+  const b = Math.floor(Math.random() * 10) + 1;
+  const c = Math.floor(Math.random() * 10) + 1;
+  const d = Math.floor(Math.random() * 10) + 1;
+  
+  // Operadores disponibles: suma, resta, multiplicación y división
+  const ops = ["+", "-", "*", "/"];
+  const op1 = ops[Math.floor(Math.random() * ops.length)];
+  const op2 = ops[Math.floor(Math.random() * ops.length)];
+  const op3 = ops[Math.floor(Math.random() * ops.length)];
+  
+  // Definir varios patrones de paréntesis
+  const patterns = [
+    `(( ${a} ${op1} ${b} ) ${op2} ${c}) ${op3} ${d}`,
+    `( ${a} ${op1} ( ${b} ${op2} ${c} )) ${op3} ${d}`,
+    `( ${a} ${op1} ${b} ) ${op2} ( ${c} ${op3} ${d} )`,
+    `${a} ${op1} (( ${b} ${op2} ${c} ) ${op3} ${d})`,
+    `${a} ${op1} ( ${b} ${op2} ( ${c} ${op3} ${d} ))`
+  ];
+  
+  // Seleccionar un patrón al azar
+  const patternIndex = Math.floor(Math.random() * patterns.length);
+  const calcExpression = patterns[patternIndex];
+  
+  try {
+    correctAnswer = eval(calcExpression);
+  } catch (e) {
+    // En caso de error (por ejemplo, división por cero), vuelve a generar la pregunta
+    generateQuestion();
+    return;
+  }
+  
+  // Para la visualización, se reemplazan los símbolos "*" y "/" por "x" y "÷"
+  let displayExpression = calcExpression.replace(/\*/g, "x").replace(/\//g, "÷");
+  questionText = `¿Cuánto es ${displayExpression}?`;
+  
+  if (questionMesh) {
+    scene.remove(questionMesh);
+    questionMesh = null;
+  }
+  updateQuestionPanel();
+  updateAnswerObjects();
+  beepPlayed = false;
+}
+
     
     // Función para actualizar el panel de pregunta con mayor resolución
     function updateQuestionPanel() {
