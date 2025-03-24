@@ -15,7 +15,6 @@
       width: 100%;
       height: 100%;
       background-color: #aaf951;
-      border: 0px solid blue;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
@@ -40,7 +39,7 @@
     }
     #overlay .respuestas-container label {
       font-size: 14px;
-       color: black;
+      color: black;
     }
     #overlay .respuestas-container select {
       font-size: 14px;
@@ -59,15 +58,14 @@
   </style>
 </head>
 <body>
-  <!-- Audios: acierto, error, timer y beep -->
+  <!-- Audios: acierto, error y timer -->
   <audio id="successSound" src="https://raw.githubusercontent.com/rafgim2/ARCalculation/main/acierto.wav" preload="auto"></audio>
   <audio id="errorSound" src="https://raw.githubusercontent.com/rafgim2/ARCalculation/main/error.wav" preload="auto"></audio>
   <audio id="timerSound" src="https://raw.githubusercontent.com/rafgim2/ARCalculation/main/timer7.wav" preload="auto"></audio>
   
-  
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.138.0/build/three.module.js';
-    // Si no es móvil, se solicita además hand-tracking
+    // Para dispositivos móviles se usará 'hit-test'
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
     const requiredFeatures = isMobile ? ['hit-test'] : ['hit-test', 'hand-tracking'];
     import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.138.0/examples/jsm/webxr/ARButton.js';
@@ -94,7 +92,7 @@
     let countdownMesh = null, countdownCanvas = null, countdownCtx = null, countdownTexture = null;
     let scoreMesh = null, scoreCanvas = null, scoreCtx = null, scoreTexture = null;
     
-    // Botón final: se mantiene solo el de Reiniciar
+    // Botón final: solo se muestra el de Reiniciar
     let restartButtonMesh = null, finalMessageMesh = null;
     
     // Número de respuestas seleccionado
@@ -106,7 +104,7 @@
     // Variable para controlar el beep (se reproducirá solo una vez cuando falten 10 segundos)
     let beepPlayed = false;
     
-    // Variables para controlar el inicio del countdown y audio al primer render con la escena lista
+    // Variables para controlar el inicio del countdown y audio cuando la escena ya esté lista
     let gameReady = false;
     let countdownStarted = false;
     
@@ -190,15 +188,14 @@
           '</select>' +
         '</div>';
       
-      // Crear el botón AR con estilos personalizados
+      // Crear el botón AR con estilos personalizados y posición centrada en la parte inferior
       const arButton = ARButton.createButton(renderer, { requiredFeatures });
-      if (arButton.parentNode) {
-        arButton.parentNode.removeChild(arButton);
-      }
+      // Se evita quitar el botón de su contenedor original para garantizar su funcionamiento,
+      // pero se reubica para que sea visible
       arButton.style.position = 'absolute';
-      arButton.style.top = '450px';
-      arButton.style.left = '100%';
-      arButton.style.transform = 'translateX(0%)';
+      arButton.style.bottom = '20px';
+      arButton.style.left = '50%';
+      arButton.style.transform = 'translateX(-50%)';
       arButton.style.width = '150px';
       arButton.style.height = '50px';
       arButton.style.fontSize = '16px';
@@ -214,7 +211,6 @@
         overlay.remove();
         generateQuestion();
         createScoreDisplay();
-        
         // Se marca que el juego ya está listo.
         gameReady = true;
       });
@@ -277,7 +273,7 @@
       );
       countdownTexture.needsUpdate = true;
       
-      if (remaining <= -10 && !beepPlayed) {
+      if (remaining <= 10 && !beepPlayed) {
         const beepSound = document.getElementById('beepSound');
         beepSound.currentTime = 0;
         beepSound.play().catch(e => console.error(e));
@@ -324,6 +320,38 @@
       updateQuestionPanel();
       updateAnswerObjects();
       beepPlayed = false;
+    }
+    
+    // Función para actualizar el panel de la pregunta con mayor resolución
+    function updateQuestionPanel() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512 * resolutionFactor;
+      canvas.height = 128 * resolutionFactor;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+      ctx.shadowBlur = 10 * resolutionFactor;
+      ctx.fillStyle = "#007BFF";
+      drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
+      ctx.shadowBlur = 0;
+      ctx.font = 'Bold ' + (48 * resolutionFactor) + 'px Arial';
+      ctx.fillStyle = "#FFFFFF";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(questionText, canvas.width / 2, canvas.height / 2);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      if (questionMesh) {
+        questionMesh.material.map = texture;
+        questionMesh.material.needsUpdate = true;
+      } else {
+        const geometry = new THREE.PlaneGeometry(0.6, 0.15);
+        const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
+        questionMesh = new THREE.Mesh(geometry, material);
+        questionMesh.position.set(0, 0.3, -0.8);
+        scene.add(questionMesh);
+      }
     }
     
     // Función para crear los paneles de respuestas con mayor resolución
@@ -488,7 +516,7 @@
     function render(timestamp, xrFrame) {
       renderer.render(scene, camera);
       
-      // Inicia el countdown y el audio en el primer frame en que la escena ya se mostró
+      // Inicia el countdown y el audio en el primer frame en que la escena se muestra
       if (gameReady && !countdownStarted) {
         startCountdown();
         const timerSound = document.getElementById('timerSound');
@@ -588,7 +616,7 @@
           }
         }
       } else {
-        // En game over, solo se mantiene el botón de Reiniciar
+        // En game over, se procesa el botón de Reiniciar
         if (restartButtonMesh) {
           const buttonPos = new THREE.Vector3();
           restartButtonMesh.getWorldPosition(buttonPos);
@@ -697,7 +725,7 @@
       timerSound.play().catch(e => console.error(e));
     }
     
-    // Listener para desbloquear el audio en dispositivos móviles (solo una vez)
+    // Listener para desbloquear el audio en móviles (solo una vez)
     window.addEventListener('touchstart', function unlockAudio() {
       const successEl = document.getElementById('successSound');
       const errorEl = document.getElementById('errorSound');
