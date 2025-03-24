@@ -215,7 +215,7 @@
         generateQuestion();
         createScoreDisplay();
         
-        // En lugar de iniciar el countdown y el audio aquí, se marca que el juego ya está listo.
+        // Se marca que el juego ya está listo
         gameReady = true;
       });
     }
@@ -307,20 +307,34 @@
       }
     }
     
-    // Función modificada para generar operaciones combinadas de 4 números con paréntesis
+    // Función modificada para generar operaciones combinadas de 4 números con paréntesis  
+    // Se generan los operandos de forma especial si el operador es división para garantizar resultados exactos
     function generateQuestion() {
       let a, b, c, d, op1, op2, op3;
       let r1, r2, final;
       const ops = ["+", "-", "*", "/"];
-      // Se utiliza el patrón: (a op1 b) op2 (c op3 d)
       while (true) {
-        a = Math.floor(Math.random() * 10) + 1;
-        b = Math.floor(Math.random() * 10) + 1;
-        c = Math.floor(Math.random() * 10) + 1;
-        d = Math.floor(Math.random() * 10) + 1;
         op1 = ops[Math.floor(Math.random() * ops.length)];
-        op2 = ops[Math.floor(Math.random() * ops.length)];
         op3 = ops[Math.floor(Math.random() * ops.length)];
+        op2 = ops[Math.floor(Math.random() * ops.length)];
+        
+        if(op1 === '/') {
+          b = Math.floor(Math.random() * 10) + 1;
+          let factor = Math.floor(Math.random() * 10) + 1;
+          a = b * factor;
+        } else {
+          a = Math.floor(Math.random() * 10) + 1;
+          b = Math.floor(Math.random() * 10) + 1;
+        }
+        
+        if(op3 === '/') {
+          d = Math.floor(Math.random() * 10) + 1;
+          let factor = Math.floor(Math.random() * 10) + 1;
+          c = d * factor;
+        } else {
+          c = Math.floor(Math.random() * 10) + 1;
+          d = Math.floor(Math.random() * 10) + 1;
+        }
         
         r1 = compute(a, op1, b);
         if (r1 === undefined) continue;
@@ -328,11 +342,9 @@
         if (r2 === undefined) continue;
         final = compute(r1, op2, r2);
         if (final === undefined) continue;
-        // Si pasa todas las validaciones, se rompe el ciclo
         break;
       }
       correctAnswer = final;
-      // La pregunta incluye paréntesis para marcar el orden: (a op1 b) op2 (c op3 d)
       // Se reemplaza "*" por "x" para visualización
       const displayOp1 = (op1 === "*") ? "x" : op1;
       const displayOp2 = (op2 === "*") ? "x" : op2;
@@ -683,7 +695,7 @@
       if (scoreMesh) scene.remove(scoreMesh);
       answers.forEach(panel => scene.remove(panel));
       
-      // Cuadro final de resultados con mayor resolución (solo se muestra el cuadro azul)
+      // Cuadro final de resultados con mayor resolución (solo se muestra el recuadro azul)
       const gameOverCanvas = document.createElement('canvas');
       gameOverCanvas.width = 256 * resolutionFactor;
       gameOverCanvas.height = 128 * resolutionFactor;
