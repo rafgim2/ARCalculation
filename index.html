@@ -40,7 +40,7 @@
     }
     #overlay .respuestas-container label {
       font-size: 14px;
-      color: black;
+       color: black;
     }
     #overlay .respuestas-container select {
       font-size: 14px;
@@ -214,7 +214,8 @@
         overlay.remove();
         generateQuestion();
         createScoreDisplay();
-        // Se marca que el juego ya está listo
+        
+        // En lugar de iniciar el countdown y el audio aquí, se marca que el juego ya está listo.
         gameReady = true;
       });
     }
@@ -296,85 +297,93 @@
       scoreTexture.needsUpdate = true;
     }
     
-    // Función auxiliar para realizar la operación y validar que el resultado sea exacto y no negativo
-    function compute(x, op, y) {
-      switch(op) {
-        case '+': return x + y;
-        case '-': return (x >= y) ? x - y : undefined;
-        case '*': return x * y;
-        case '/': return (y !== 0 && x % y === 0) ? x / y : undefined;
-      }
-    }
-    
-    // Función modificada para generar operaciones combinadas de 4 números con paréntesis
-    // Se impone un límite de iteraciones para evitar bloqueos en caso de no encontrar una combinación válida
+    // Función modificada para generar operaciones combinadas con 3 números, con paréntesis,
+    // usando +, -, * y /, garantizando que el resultado intermedio y final sean exactos y sin negativos.
     function generateQuestion() {
-      let a, b, c, d, op1, op2, op3;
-      let r1, r2, final;
-      const ops = ["+", "-", "*", "/"];
-      const maxIterations = 1000;
-      let iterations = 0;
-      
-      while (iterations < maxIterations) {
-        iterations++;
-        op1 = ops[Math.floor(Math.random() * ops.length)];
-        op3 = ops[Math.floor(Math.random() * ops.length)];
-        op2 = ops[Math.floor(Math.random() * ops.length)];
-        
-        // Generar grupo 1
-        if(op1 === '/') {
-          b = Math.floor(Math.random() * 10) + 1;
-          let factor = Math.floor(Math.random() * 10) + 1;
-          a = b * factor;
-        } else if(op1 === '-') {
-          a = Math.floor(Math.random() * 10) + 1;
-          b = Math.floor(Math.random() * 10) + 1;
-          if(a < b) [a, b] = [b, a];
+      let valid = false;
+      let expr = "";
+      let displayExpr = "";
+      let ans;
+      while (!valid) {
+        // Generar tres operandos entre 1 y 10
+        const a = Math.floor(Math.random() * 10) + 1;
+        const b = Math.floor(Math.random() * 10) + 1;
+        const c = Math.floor(Math.random() * 10) + 1;
+        const ops = ["+", "-", "*", "/"];
+        const op1 = ops[Math.floor(Math.random() * ops.length)];
+        const op2 = ops[Math.floor(Math.random() * ops.length)];
+        // Elegir estructura aleatoria: 0 = (a op1 b) op2 c; 1 = a op1 (b op2 c)
+        const structure = Math.random() < 0.5 ? 0 : 1;
+        if (structure === 0) {
+          // Calcular (a op1 b)
+          let first;
+          if (op1 === "/") {
+            if (b === 0 || a % b !== 0) continue;
+            first = a / b;
+          } else if (op1 === "-") {
+            if (a < b) continue;
+            first = a - b;
+          } else if (op1 === "+") {
+            first = a + b;
+          } else if (op1 === "*") {
+            first = a * b;
+          }
+          // Calcular (first op2 c)
+          let final;
+          if (op2 === "/") {
+            if (c === 0 || first % c !== 0) continue;
+            final = first / c;
+          } else if (op2 === "-") {
+            if (first < c) continue;
+            final = first - c;
+          } else if (op2 === "+") {
+            final = first + c;
+          } else if (op2 === "*") {
+            final = first * c;
+          }
+          valid = true;
+          ans = final;
+          expr = `(${a} ${op1} ${b}) ${op2} ${c}`;
+          const dOp1 = op1 === "*" ? "x" : op1;
+          const dOp2 = op2 === "*" ? "x" : op2;
+          displayExpr = `¿Cuánto es (${a} ${dOp1} ${b}) ${dOp2} ${c}?`;
         } else {
-          a = Math.floor(Math.random() * 10) + 1;
-          b = Math.floor(Math.random() * 10) + 1;
+          // Calcular (b op2 c)
+          let second;
+          if (op2 === "/") {
+            if (c === 0 || b % c !== 0) continue;
+            second = b / c;
+          } else if (op2 === "-") {
+            if (b < c) continue;
+            second = b - c;
+          } else if (op2 === "+") {
+            second = b + c;
+          } else if (op2 === "*") {
+            second = b * c;
+          }
+          // Calcular a op1 (second)
+          let final;
+          if (op1 === "/") {
+            if (second === 0 || a % second !== 0) continue;
+            final = a / second;
+          } else if (op1 === "-") {
+            if (a < second) continue;
+            final = a - second;
+          } else if (op1 === "+") {
+            final = a + second;
+          } else if (op1 === "*") {
+            final = a * second;
+          }
+          valid = true;
+          ans = final;
+          expr = `${a} ${op1} (${b} ${op2} ${c})`;
+          const dOp1 = op1 === "*" ? "x" : op1;
+          const dOp2 = op2 === "*" ? "x" : op2;
+          displayExpr = `¿Cuánto es ${a} ${dOp1} (${b} ${dOp2} ${c})?`;
         }
-        
-        // Generar grupo 2
-        if(op3 === '/') {
-          d = Math.floor(Math.random() * 10) + 1;
-          let factor = Math.floor(Math.random() * 10) + 1;
-          c = d * factor;
-        } else if(op3 === '-') {
-          c = Math.floor(Math.random() * 10) + 1;
-          d = Math.floor(Math.random() * 10) + 1;
-          if(c < d) [c, d] = [d, c];
-        } else {
-          c = Math.floor(Math.random() * 10) + 1;
-          d = Math.floor(Math.random() * 10) + 1;
-        }
-        
-        r1 = compute(a, op1, b);
-        if (r1 === undefined) continue;
-        r2 = compute(c, op3, d);
-        if (r2 === undefined) continue;
-        
-        // Si op2 es división, se verifica que r2 no sea 0 y que r1 sea divisible por r2.
-        if(op2 === '/' && (r2 === 0 || r1 % r2 !== 0)) continue;
-        final = compute(r1, op2, r2);
-        if (final === undefined) continue;
-        // Si se llega hasta aquí, se encontró una combinación válida
-        break;
       }
-      
-      // Si se alcanzó el límite sin hallar una combinación válida, se forzará op2 a suma
-      if(iterations >= maxIterations) {
-        op2 = '+';
-        final = compute(r1, op2, r2);
-      }
-      
-      correctAnswer = final;
-      // Para visualización, reemplazar "*" por "x"
-      const displayOp1 = (op1 === "*") ? "x" : op1;
-      const displayOp2 = (op2 === "*") ? "x" : op2;
-      const displayOp3 = (op3 === "*") ? "x" : op3;
-      questionText = `¿Cuánto es (${a} ${displayOp1} ${b}) ${displayOp2} (${c} ${displayOp3} ${d})?`;
-      
+      correctAnswer = ans;
+      questionText = displayExpr;
       if (questionMesh) {
         scene.remove(questionMesh);
         questionMesh = null;
@@ -384,7 +393,7 @@
       beepPlayed = false;
     }
     
-    // Función para actualizar el panel de pregunta con mayor resolución (se reduce la fuente para que quepa)
+    // Función para actualizar el panel de pregunta con mayor resolución (se reduce la fuente para que quepa en el recuadro azul)
     function updateQuestionPanel() {
       const canvas = document.createElement('canvas');
       canvas.width = 512 * resolutionFactor;
@@ -396,7 +405,7 @@
       ctx.fillStyle = "#007BFF";
       drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
       ctx.shadowBlur = 0;
-      // Se reduce el tamaño de fuente para que la operación larga quepa en el recuadro azul
+      // Fuente reducida para ajustar la pregunta en el recuadro
       ctx.font = 'Bold ' + (36 * resolutionFactor) + 'px Arial';
       ctx.fillStyle = "#FFFFFF";
       ctx.textAlign = 'center';
@@ -451,14 +460,13 @@
             ctx.fillStyle = "#FFFFFF";
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            // Generar respuestas incorrectas parecidas al resultado correcto:
             const wrongAnswers = new Set();
+            // Generar distractores similares al resultado correcto
             while (wrongAnswers.size < (numAnswers - 1)) {
-              let offset = Math.floor(Math.random() * 7) - 3;
-              if(offset === 0) continue;
-              let wrong = correctAnswer + offset;
-              if (wrong < 0) continue;
-              wrongAnswers.add(wrong);
+              let diff = Math.floor(Math.random() * 11) - 5; // -5 a 5
+              if(diff === 0) continue;
+              let wrong = correctAnswer + diff;
+              if(wrong > 0 && wrong !== correctAnswer) wrongAnswers.add(wrong);
             }
             const answersArray = [correctAnswer, ...wrongAnswers];
             answersArray.sort(() => Math.random() - 0.5);
@@ -503,11 +511,10 @@
             ctx.textBaseline = 'middle';
             const wrongAnswers = new Set();
             while (wrongAnswers.size < (numAnswers - 1)) {
-              let offset = Math.floor(Math.random() * 7) - 3;
-              if(offset === 0) continue;
-              let wrong = correctAnswer + offset;
-              if (wrong < 0) continue;
-              wrongAnswers.add(wrong);
+              let diff = Math.floor(Math.random() * 11) - 5;
+              if(diff === 0) continue;
+              let wrong = correctAnswer + diff;
+              if(wrong > 0 && wrong !== correctAnswer) wrongAnswers.add(wrong);
             }
             const answersArray = [correctAnswer, ...wrongAnswers];
             answersArray.sort(() => Math.random() - 0.5);
@@ -529,11 +536,10 @@
         const numAnswersExisting = selectedNumAnswers;
         const wrongAnswers = new Set();
         while (wrongAnswers.size < (numAnswersExisting - 1)) {
-          let offset = Math.floor(Math.random() * 7) - 3;
-          if(offset === 0) continue;
-          let wrong = correctAnswer + offset;
-          if (wrong < 0) continue;
-          wrongAnswers.add(wrong);
+          let diff = Math.floor(Math.random() * 11) - 5;
+          if(diff === 0) continue;
+          let wrong = correctAnswer + diff;
+          if(wrong > 0 && wrong !== correctAnswer) wrongAnswers.add(wrong);
         }
         const answersArray = [correctAnswer, ...wrongAnswers];
         answersArray.sort(() => Math.random() - 0.5);
@@ -719,7 +725,7 @@
       if (scoreMesh) scene.remove(scoreMesh);
       answers.forEach(panel => scene.remove(panel));
       
-      // Cuadro final de resultados con mayor resolución (solo se muestra el recuadro azul)
+      // Cuadro final de resultados con mayor resolución (solo se muestra el cuadro azul)
       const gameOverCanvas = document.createElement('canvas');
       gameOverCanvas.width = 256 * resolutionFactor;
       gameOverCanvas.height = 128 * resolutionFactor;
