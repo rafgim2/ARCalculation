@@ -14,7 +14,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background-color: orange;
+      background-color: #aaf951;
       border: 0px solid blue;
       display: flex;
       flex-direction: column;
@@ -40,7 +40,7 @@
     }
     #overlay .respuestas-container label {
       font-size: 14px;
-      color: black;
+       color: black;
     }
     #overlay .respuestas-container select {
       font-size: 14px;
@@ -175,7 +175,7 @@
       const overlay = document.createElement('div');
       overlay.id = 'overlay';
       overlay.innerHTML =
-        '<img src="ARCalc" alt="ARCalculation" style="margin-bottom:20px;">' +
+        '<img src="ARCalc.jpeg" alt="ARCalculation" style="margin-bottom:20px;">' +
         '<a href="https://www.youtube.com/@rafgim" target="_blank">© By Rafael Gimeno</a>' +
         '<div class="respuestas-container">' +
           '<label for="numAnswers">Respuestas:</label>' +
@@ -215,7 +215,7 @@
         generateQuestion();
         createScoreDisplay();
         
-        // En lugar de iniciar el countdown y el audio aquí, se marca que el juego ya está listo.
+        // Se marca que el juego ya está listo.
         gameReady = true;
       });
     }
@@ -297,21 +297,26 @@
       scoreTexture.needsUpdate = true;
     }
     
-    // Genera una pregunta con operaciones combinadas
+    // Genera una operación combinada con tres operandos y dos operadores.
+    // Se escogen dos operadores al azar entre +, - y * (multiplicación).
+    // En la visualización se reemplaza el * por "x".
     function generateQuestion() {
       const a = Math.floor(Math.random() * 10) + 1;
       const b = Math.floor(Math.random() * 10) + 1;
       const c = Math.floor(Math.random() * 10) + 1;
-      const operators = ["+", "-", "*"];
-      const op1 = operators[Math.floor(Math.random() * operators.length)];
-      const op2 = operators[Math.floor(Math.random() * operators.length)];
-      // Para mostrar la multiplicación con "x"
-      const dispOp1 = op1 === "*" ? " x " : " " + op1 + " ";
-      const dispOp2 = op2 === "*" ? " x " : " " + op2 + " ";
-      questionText = `¿Cuánto es ${a}${dispOp1}${b}${dispOp2}${c}?`;
-      // Para evaluar la expresión se usa el operador real ("*" en lugar de "x")
-      const expr = `${a} ${op1} ${b} ${op2} ${c}`;
-      correctAnswer = eval(expr);
+      
+      const ops = ['+', '-', '*'];
+      const op1 = ops[Math.floor(Math.random() * ops.length)];
+      const op2 = ops[Math.floor(Math.random() * ops.length)];
+      
+      const dispOp1 = op1 === '*' ? 'x' : op1;
+      const dispOp2 = op2 === '*' ? 'x' : op2;
+      
+      questionText = `¿Cuánto es ${a} ${dispOp1} ${b} ${dispOp2} ${c}?`;
+      
+      // Evalúa la expresión respetando la precedencia de operadores
+      correctAnswer = eval(`${a} ${op1} ${b} ${op2} ${c}`);
+      
       if(questionMesh) {
         scene.remove(questionMesh);
         questionMesh = null;
@@ -319,38 +324,6 @@
       updateQuestionPanel();
       updateAnswerObjects();
       beepPlayed = false;
-    }
-    
-    // Función para actualizar el panel de pregunta con mayor resolución
-    function updateQuestionPanel() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512 * resolutionFactor;
-      canvas.height = 128 * resolutionFactor;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-      ctx.shadowBlur = 10 * resolutionFactor;
-      ctx.fillStyle = "#007BFF";
-      drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
-      ctx.shadowBlur = 0;
-      ctx.font = 'Bold ' + (48 * resolutionFactor) + 'px Arial';
-      ctx.fillStyle = "#FFFFFF";
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(questionText, canvas.width / 2, canvas.height / 2);
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      if (questionMesh) {
-        questionMesh.material.map = texture;
-        questionMesh.material.needsUpdate = true;
-      } else {
-        const geometry = new THREE.PlaneGeometry(0.6, 0.15);
-        const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
-        questionMesh = new THREE.Mesh(geometry, material);
-        questionMesh.position.set(0, 0.3, -0.8);
-        scene.add(questionMesh);
-      }
     }
     
     // Función para crear los paneles de respuestas con mayor resolución
@@ -387,11 +360,13 @@
             ctx.fillStyle = "#FFFFFF";
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            // Generar respuestas erróneas basadas en el resultado correcto
+            // Genera respuestas falsas cercanas al valor correcto
             const wrongAnswers = new Set();
             while (wrongAnswers.size < (numAnswers - 1)) {
-              let wrong = correctAnswer + Math.floor(Math.random() * 21) - 10;
-              if (wrong !== correctAnswer) wrongAnswers.add(wrong);
+              let offset = Math.floor(Math.random() * 21) - 10;
+              if(offset === 0) continue;
+              let wrong = correctAnswer + offset;
+              wrongAnswers.add(wrong);
             }
             const answersArray = [correctAnswer, ...wrongAnswers];
             answersArray.sort(() => Math.random() - 0.5);
@@ -436,8 +411,10 @@
             ctx.textBaseline = 'middle';
             const wrongAnswers = new Set();
             while (wrongAnswers.size < (numAnswers - 1)) {
-              let wrong = correctAnswer + Math.floor(Math.random() * 21) - 10;
-              if (wrong !== correctAnswer) wrongAnswers.add(wrong);
+              let offset = Math.floor(Math.random() * 21) - 10;
+              if(offset === 0) continue;
+              let wrong = correctAnswer + offset;
+              wrongAnswers.add(wrong);
             }
             const answersArray = [correctAnswer, ...wrongAnswers];
             answersArray.sort(() => Math.random() - 0.5);
@@ -459,8 +436,10 @@
         const numAnswersExisting = selectedNumAnswers;
         const wrongAnswers = new Set();
         while (wrongAnswers.size < (numAnswersExisting - 1)) {
-          let wrong = correctAnswer + Math.floor(Math.random() * 21) - 10;
-          if (wrong !== correctAnswer) wrongAnswers.add(wrong);
+          let offset = Math.floor(Math.random() * 21) - 10;
+          if(offset === 0) continue;
+          let wrong = correctAnswer + offset;
+          wrongAnswers.add(wrong);
         }
         const answersArray = [correctAnswer, ...wrongAnswers];
         answersArray.sort(() => Math.random() - 0.5);
@@ -513,7 +492,7 @@
       if (gameReady && !countdownStarted) {
         startCountdown();
         const timerSound = document.getElementById('timerSound');
-        timerSound.loop = false; // No repetir el audio
+        timerSound.loop = false;
         timerSound.play().catch(e => console.error(e));
         countdownStarted = true;
       }
@@ -635,18 +614,11 @@
     
     function endGame() {
       gameOver = true;
-      // Se elimina la pausa del audio, de modo que éste siga hasta su final sin reiniciarse
-      // const timerSound = document.getElementById('timerSound');
-      // timerSound.pause();
-      // timerSound.currentTime = 0;
-      
       if (questionMesh) scene.remove(questionMesh);
       if (countdownMesh) scene.remove(countdownMesh);
-      // Se elimina el marcador que se muestra durante el juego
       if (scoreMesh) scene.remove(scoreMesh);
       answers.forEach(panel => scene.remove(panel));
       
-      // Cuadro final de resultados con mayor resolución (solo se muestra el cuadro azul)
       const gameOverCanvas = document.createElement('canvas');
       gameOverCanvas.width = 256 * resolutionFactor;
       gameOverCanvas.height = 128 * resolutionFactor;
@@ -670,7 +642,6 @@
       finalMessageMesh.position.set(0, 0, -0.8);
       scene.add(finalMessageMesh);
       
-      // Se crea solo el botón de Reiniciar, posicionado un poco más arriba (por ejemplo, en y = -0.3)
       restartButtonMesh = createButton("Reiniciar");
       restartButtonMesh.position.set(0, -0.3, -0.8);
       scene.add(restartButtonMesh);
@@ -716,18 +687,17 @@
       createAnswerObjects(selectedNumAnswers, true);
       
       generateQuestion();
-      // Reiniciamos variables para iniciar el countdown y el audio de nuevo en el primer frame renderizado
       countdownStarted = false;
       gameReady = true;
       createScoreDisplay();
       
       const timerSound = document.getElementById('timerSound');
       timerSound.currentTime = 0;
-      timerSound.loop = false; // No repetir el audio
+      timerSound.loop = false;
       timerSound.play().catch(e => console.error(e));
     }
     
-    // Listener para desbloquear el audio en dispositivos móviles (se ejecuta solo una vez)
+    // Listener para desbloquear el audio en dispositivos móviles (solo una vez)
     window.addEventListener('touchstart', function unlockAudio() {
       const successEl = document.getElementById('successSound');
       const errorEl = document.getElementById('errorSound');
@@ -739,22 +709,18 @@
       });
     }, { once: true });
     
-    // Listener adicional para detectar toques en la pantalla y procesar la respuesta
+    // Listener para detectar toques en la pantalla (aplicable solo en móviles)
     window.addEventListener('touchstart', function(event) {
-      // Solo aplicar en móviles
       if (!/Mobi|Android/i.test(navigator.userAgent)) return;
       
-      // Convertir la posición del toque a coordenadas normalizadas (NDC)
       const touch = event.touches[0];
       const x = (touch.clientX / window.innerWidth) * 2 - 1;
       const y = - (touch.clientY / window.innerHeight) * 2 + 1;
       const mouseVector = new THREE.Vector2(x, y);
       
-      // Crear el raycaster y configurarlo con la cámara
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(mouseVector, camera);
       
-      // Determinar qué objetos comprobar según si el juego está activo o finalizado
       let objectsToIntersect = [];
       if (!gameOver) {
         objectsToIntersect = answers;
@@ -764,14 +730,12 @@
         }
       }
       
-      // Realizar la intersección
       const intersects = raycaster.intersectObjects(objectsToIntersect);
       
       if (intersects.length > 0 && !hasCollided) {
         const panel = intersects[0].object;
         hasCollided = true;
         if (!gameOver) {
-          // Verificar si la respuesta es correcta
           if (panel.userData.answer === correctAnswer) {
             correctCount++;
             const successSound = document.getElementById('successSound');
@@ -783,7 +747,7 @@
             setTimeout(() => {
               if (!gameOver) {
                 generateQuestion();
-                if (questionMesh) questionMesh.visible = true;
+                if(questionMesh) questionMesh.visible = true;
                 answers.forEach(a => a.visible = true);
               }
               hasCollided = false;
@@ -800,7 +764,6 @@
             }, 500);
           }
         } else {
-          // En game over, se procesa el botón de Reiniciar
           const successSound = document.getElementById('successSound');
           const successClone = successSound.cloneNode();
           successClone.play().catch(e => console.error(e));
