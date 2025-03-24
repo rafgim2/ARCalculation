@@ -297,93 +297,65 @@
       scoreTexture.needsUpdate = true;
     }
     
-    // Función modificada para generar operaciones combinadas con tres números, incluyendo +, -, *, / y paréntesis
+    // Función modificada para generar operaciones combinadas con tres números y paréntesis,
+    // asegurando que el resultado final sea exacto y sin números negativos.
     function generateQuestion() {
-      let a, b, c, op1, op2;
-      let structure = Math.random() < 0.5 ? 1 : 2; // 1: (a op1 b) op2 c, 2: a op1 (b op2 c)
-      const operators = ["+", "-", "*", "/"];
-      op1 = operators[Math.floor(Math.random() * operators.length)];
-      op2 = operators[Math.floor(Math.random() * operators.length)];
-      
-      if (structure === 1) {
-        // Estructura: (a op1 b) op2 c
-        if(op1 === "/") {
-          b = Math.floor(Math.random() * 10) + 1;
-          let maxFactor = Math.floor(10 / b) || 1;
-          let factor = Math.floor(Math.random() * maxFactor) + 1;
-          a = b * factor;
-        } else {
-          a = Math.floor(Math.random() * 10) + 1;
-          b = Math.floor(Math.random() * 10) + 1;
-        }
-        let X;
-        switch(op1) {
-          case '+': X = a + b; break;
-          case '-': X = a - b; break;
-          case '*': X = a * b; break;
-          case '/': X = a / b; break;
-        }
-        if(op2 === "/") {
-          // Elegir c de entre los divisores exactos de X en 1-10
-          let divisors = [];
-          for (let i = 1; i <= 10; i++) {
-            if(X % i === 0) divisors.push(i);
+      const ops = ["+", "-", "*"];
+      let a, b, c, op1, op2, calcExpression, displayExpression, structure;
+      while (true) {
+        a = Math.floor(Math.random() * 10) + 1;
+        b = Math.floor(Math.random() * 10) + 1;
+        c = Math.floor(Math.random() * 10) + 1;
+        op1 = ops[Math.floor(Math.random() * ops.length)];
+        op2 = ops[Math.floor(Math.random() * ops.length)];
+        structure = Math.random() < 0.5 ? 0 : 1; // 0: (a op1 b) op2 c, 1: a op1 (b op2 c)
+        if (structure === 0) {
+          // Estructura: (a op1 b) op2 c
+          if (op1 === '-' && a < b) { let temp = a; a = b; b = temp; }
+          let part1 = eval(`${a} ${op1} ${b}`);
+          // Para resta en el segundo operador, aseguramos que part1 >= c
+          if (op2 === '-' && part1 < c) {
+            if (part1 > 0) {
+              c = Math.floor(Math.random() * part1) + 1;
+            } else {
+              continue; // si part1 es 0, volvemos a generar
+            }
           }
-          if(divisors.length === 0) {
-            op2 = operators[Math.floor(Math.random() * 3)]; // Reemplazar división por otro operador
-            c = Math.floor(Math.random() * 10) + 1;
-          } else {
-            c = divisors[Math.floor(Math.random() * divisors.length)];
+          calcExpression = `(${a} ${op1} ${b}) ${op2} ${c}`;
+          // Se sale del bucle si el resultado final es no negativo
+          if (eval(calcExpression) >= 0) break;
+        } else {
+          // Estructura: a op1 (b op2 c)
+          if (op2 === '-' && b < c) { let temp = b; b = c; c = temp; }
+          let part2 = eval(`${b} ${op2} ${c}`);
+          if (op1 === '-' && a < part2) {
+            a = Math.floor(Math.random() * 10) + part2; // Aseguramos que a >= part2
           }
-        } else {
-          c = Math.floor(Math.random() * 10) + 1;
+          calcExpression = `${a} ${op1} (${b} ${op2} ${c})`;
+          if (eval(calcExpression) >= 0) break;
         }
-        // Construir la expresión con paréntesis
-        let expressionStr = `(${a} ${op1} ${b}) ${op2} ${c}`;
-        // Evaluar la expresión
-        correctAnswer = eval(expressionStr);
-        // Para mostrar se sustituyen los operadores * y / por símbolos más familiares
-        let dispOp1 = op1 === "*" ? "x" : (op1 === "/" ? "÷" : op1);
-        let dispOp2 = op2 === "*" ? "x" : (op2 === "/" ? "÷" : op2);
-        questionText = `¿Cuánto es (${a} ${dispOp1} ${b}) ${dispOp2} ${c}?`;
-      } else {
-        // Estructura: a op1 (b op2 c)
-        if(op2 === "/") {
-          c = Math.floor(Math.random() * 10) + 1;
-          let maxFactor = Math.floor(10 / c) || 1;
-          let factor = Math.floor(Math.random() * maxFactor) + 1;
-          b = c * factor;
-        } else {
-          b = Math.floor(Math.random() * 10) + 1;
-          c = Math.floor(Math.random() * 10) + 1;
-        }
-        let Y;
-        switch(op2) {
-          case '+': Y = b + c; break;
-          case '-': Y = b - c; break;
-          case '*': Y = b * c; break;
-          case '/': Y = b / c; break;
-        }
-        if(op1 === "/") {
-          let maxFactor = Math.floor(10 / Y) || 1;
-          let factor = Math.floor(Math.random() * maxFactor) + 1;
-          a = Y * factor;
-        } else {
-          a = Math.floor(Math.random() * 10) + 1;
-        }
-        let expressionStr = `${a} ${op1} (${b} ${op2} ${c})`;
-        correctAnswer = eval(expressionStr);
-        let dispOp1 = op1 === "*" ? "x" : (op1 === "/" ? "÷" : op1);
-        let dispOp2 = op2 === "*" ? "x" : (op2 === "/" ? "÷" : op2);
-        questionText = `¿Cuánto es ${a} ${dispOp1} (${b} ${dispOp2} ${c})?`;
       }
-      // Ajuste para que la pregunta se muestre bien en el recuadro azul
+      correctAnswer = eval(calcExpression);
+      // Preparar la expresión para mostrar (reemplazando "*" por "x")
+      const displayOp1 = op1 === "*" ? "x" : op1;
+      const displayOp2 = op2 === "*" ? "x" : op2;
+      if (structure === 0) {
+        displayExpression = `(${a} ${displayOp1} ${b}) ${displayOp2} ${c}`;
+      } else {
+        displayExpression = `${a} ${displayOp1} (${b} ${displayOp2} ${c})`;
+      }
+      questionText = `¿Cuánto es ${displayExpression}?`;
+      if (questionMesh) {
+        scene.remove(questionMesh);
+        questionMesh = null;
+      }
       updateQuestionPanel();
       updateAnswerObjects();
       beepPlayed = false;
     }
     
-    // Función para actualizar el panel de pregunta con mayor resolución (se ha reducido el tamaño de fuente para que quepa bien)
+    // Función para actualizar el panel de pregunta con mayor resolución,
+    // ajustando dinámicamente el tamaño de la fuente para que la pregunta quepa en el recuadro azul.
     function updateQuestionPanel() {
       const canvas = document.createElement('canvas');
       canvas.width = 512 * resolutionFactor;
@@ -395,8 +367,14 @@
       ctx.fillStyle = "#007BFF";
       drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
       ctx.shadowBlur = 0;
-      // Se redujo el tamaño de fuente para asegurar que la pregunta quepa en el recuadro azul
-      ctx.font = 'Bold ' + (36 * resolutionFactor) + 'px Arial';
+      // Ajuste de la fuente para que el texto quepa en el recuadro
+      let fontSize = 48 * resolutionFactor;
+      ctx.font = 'Bold ' + fontSize + 'px Arial';
+      const maxWidth = canvas.width * 0.9;
+      while (ctx.measureText(questionText).width > maxWidth && fontSize > 12 * resolutionFactor) {
+        fontSize -= 2 * resolutionFactor;
+        ctx.font = 'Bold ' + fontSize + 'px Arial';
+      }
       ctx.fillStyle = "#FFFFFF";
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -450,11 +428,9 @@
             ctx.fillStyle = "#FFFFFF";
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            // Generar distractores cercanos al resultado correcto
             const wrongAnswers = new Set();
             while (wrongAnswers.size < (numAnswers - 1)) {
-              let offset = Math.floor(Math.random() * 11) - 5; // offset entre -5 y 5
-              let wrong = correctAnswer + offset;
+              let wrong = Math.floor(Math.random() * 100) + 1;
               if (wrong !== correctAnswer) wrongAnswers.add(wrong);
             }
             const answersArray = [correctAnswer, ...wrongAnswers];
@@ -500,8 +476,7 @@
             ctx.textBaseline = 'middle';
             const wrongAnswers = new Set();
             while (wrongAnswers.size < (numAnswers - 1)) {
-              let offset = Math.floor(Math.random() * 11) - 5;
-              let wrong = correctAnswer + offset;
+              let wrong = Math.floor(Math.random() * 100) + 1;
               if (wrong !== correctAnswer) wrongAnswers.add(wrong);
             }
             const answersArray = [correctAnswer, ...wrongAnswers];
@@ -524,8 +499,7 @@
         const numAnswersExisting = selectedNumAnswers;
         const wrongAnswers = new Set();
         while (wrongAnswers.size < (numAnswersExisting - 1)) {
-          let offset = Math.floor(Math.random() * 11) - 5;
-          let wrong = correctAnswer + offset;
+          let wrong = Math.floor(Math.random() * 100) + 1;
           if (wrong !== correctAnswer) wrongAnswers.add(wrong);
         }
         const answersArray = [correctAnswer, ...wrongAnswers];
