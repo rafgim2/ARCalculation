@@ -15,6 +15,7 @@
       width: 100%;
       height: 100%;
       background-color: #aaf951;
+      border: 0px solid blue;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
@@ -188,14 +189,15 @@
           '</select>' +
         '</div>';
       
-      // Crear el botón AR con estilos personalizados y posición centrada en la parte inferior
+      // Crear el botón AR con los estilos originales
       const arButton = ARButton.createButton(renderer, { requiredFeatures });
-      // Se evita quitar el botón de su contenedor original para garantizar su funcionamiento,
-      // pero se reubica para que sea visible
+      if (arButton.parentNode) {
+        arButton.parentNode.removeChild(arButton);
+      }
       arButton.style.position = 'absolute';
-      arButton.style.bottom = '20px';
-      arButton.style.left = '50%';
-      arButton.style.transform = 'translateX(-50%)';
+      arButton.style.top = '450px';
+      arButton.style.left = '100%';
+      arButton.style.transform = 'translateX(0%)';
       arButton.style.width = '150px';
       arButton.style.height = '50px';
       arButton.style.fontSize = '16px';
@@ -273,7 +275,7 @@
       );
       countdownTexture.needsUpdate = true;
       
-      if (remaining <= -10 && !beepPlayed) {
+      if (remaining <= 10 && !beepPlayed) {
         const beepSound = document.getElementById('beepSound');
         beepSound.currentTime = 0;
         beepSound.play().catch(e => console.error(e));
