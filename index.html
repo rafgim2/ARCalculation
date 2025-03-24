@@ -273,7 +273,7 @@
       );
       countdownTexture.needsUpdate = true;
       
-      if (remaining <= 10 && !beepPlayed) {
+      if (remaining <= -10 && !beepPlayed) {
         const beepSound = document.getElementById('beepSound');
         beepSound.currentTime = 0;
         beepSound.play().catch(e => console.error(e));
