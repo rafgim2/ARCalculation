@@ -14,8 +14,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background-color: #aaf951;
-      border: 0px solid blue;
+      background-color: #aaf951; /* Verde claro */
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
@@ -40,7 +39,7 @@
     }
     #overlay .respuestas-container label {
       font-size: 14px;
-       color: black;
+      color: black;
     }
     #overlay .respuestas-container select {
       font-size: 14px;
@@ -67,7 +66,6 @@
   
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.138.0/build/three.module.js';
-    // Si no es móvil, se solicita además hand-tracking
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
     const requiredFeatures = isMobile ? ['hit-test'] : ['hit-test', 'hand-tracking'];
     import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.138.0/examples/jsm/webxr/ARButton.js';
@@ -79,6 +77,7 @@
     let questionMesh = null;
     let questionText = "";
     const collisionThreshold = 0.2;
+    // Array que manejará las partículas de chispas
     const sparksSystems = [];
     
     // Contadores de aciertos y fallos
@@ -94,7 +93,7 @@
     let countdownMesh = null, countdownCanvas = null, countdownCtx = null, countdownTexture = null;
     let scoreMesh = null, scoreCanvas = null, scoreCtx = null, scoreTexture = null;
     
-    // Botón final: se mantiene solo el de Reiniciar
+    // Botón final: Reiniciar
     let restartButtonMesh = null, finalMessageMesh = null;
     
     // Número de respuestas seleccionado
@@ -103,17 +102,20 @@
     // Almacenar la posición y orientación originales de cada panel
     let originalAnswerTransforms = null;
     
-    // Variable para controlar el beep (se reproducirá solo una vez cuando falten 10 segundos)
+    // Variable para controlar el beep
     let beepPlayed = false;
     
-    // Variables para controlar el inicio del countdown y audio al primer render con la escena lista
+    // Variables para controlar el inicio del countdown y audio
     let gameReady = false;
     let countdownStarted = false;
     
-    // Factor para mejorar la resolución de los canvas (multiplicador)
+    // Factor para mejorar la resolución de los canvas
     const resolutionFactor = 4;
-    
-    // Función para dibujar un rectángulo redondeado
+
+    // =============================================================================
+    // 1. Quitar sombras de los paneles (pregunta, respuestas y panel final)
+    // =============================================================================
+    // Función para dibujar un rectángulo redondeado SIN SOMBRAS
     function drawRoundedRect(ctx, x, y, width, height, radius) {
       ctx.beginPath();
       ctx.moveTo(x + radius, y);
@@ -129,23 +131,25 @@
       ctx.fill();
     }
     
-    // Función para actualizar el panel de respuesta con mayor resolución
+    // =============================================================================
+    // 2. Panel de respuesta sin sombras
+    // =============================================================================
     function updateAnswerPanel(mesh, value) {
+      // Sin sombras
       const canvas = document.createElement('canvas');
       canvas.width = 256 * resolutionFactor;
       canvas.height = 256 * resolutionFactor;
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-      ctx.shadowBlur = 10 * resolutionFactor;
+      
       ctx.fillStyle = "#007BFF";
       drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
-      ctx.shadowBlur = 0;
       ctx.font = 'Bold ' + (75 * resolutionFactor) + 'px Arial';
       ctx.fillStyle = "#FFFFFF";
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(value, canvas.width / 2, canvas.height / 2);
+      
       const texture = new THREE.CanvasTexture(canvas);
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
@@ -153,8 +157,10 @@
       mesh.material.needsUpdate = true;
       mesh.userData.answer = value;
     }
-    
-    // Función para inicializar la escena AR
+
+    // =============================================================================
+    // 3. Creación y manejo de la escena
+    // =============================================================================
     function init() {
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
@@ -171,7 +177,7 @@
       
       window.addEventListener('resize', onWindowResize, false);
       
-      // Crear overlay inicial
+      // Creamos el overlay inicial
       const overlay = document.createElement('div');
       overlay.id = 'overlay';
       overlay.innerHTML =
@@ -190,7 +196,7 @@
           '</select>' +
         '</div>';
       
-      // Crear el botón AR con estilos personalizados
+      // Crear el botón AR con estilos
       const arButton = ARButton.createButton(renderer, { requiredFeatures });
       if (arButton.parentNode) {
         arButton.parentNode.removeChild(arButton);
@@ -214,8 +220,6 @@
         overlay.remove();
         generateQuestion();
         createScoreDisplay();
-        
-        // En lugar de iniciar el countdown y el audio aquí, se marca que el juego ya está listo.
         gameReady = true;
       });
     }
@@ -226,7 +230,9 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     }
     
-    // Función para iniciar el conteo regresivo
+    // =============================================================================
+    // 4. Conteo regresivo sin sombras
+    // =============================================================================
     function startCountdown() {
       gameStartTime = performance.now();
       countdownCanvas = document.createElement('canvas');
@@ -239,12 +245,13 @@
       const geometry = new THREE.PlaneGeometry(0.6, 0.3);
       const material = new THREE.MeshBasicMaterial({ map: countdownTexture, transparent: true });
       countdownMesh = new THREE.Mesh(geometry, material);
-      // Posición ajustada a -0.8 en Z para estar más cerca del usuario
       countdownMesh.position.set(0, 0.50, -0.82);
       scene.add(countdownMesh);
     }
-    
-    // Función para crear la visualización del score durante el juego
+
+    // =============================================================================
+    // 5. Visualización del score
+    // =============================================================================
     function createScoreDisplay() {
       scoreCanvas = document.createElement('canvas');
       scoreCanvas.width = 256 * resolutionFactor;
@@ -259,7 +266,7 @@
       scoreMesh.position.set(0, -0.2, -0.8);
       scene.add(scoreMesh);
     }
-    
+
     function updateCountdown() {
       const elapsed = (performance.now() - gameStartTime) / 1000;
       const remaining = Math.max(0, gameDuration - elapsed);
@@ -297,8 +304,10 @@
       scoreTexture.needsUpdate = true;
     }
     
-    // Función modificada para generar operaciones combinadas con tres números y paréntesis,
-    // asegurando que el resultado final sea exacto y sin números negativos.
+    // =============================================================================
+    // 6. Generar la pregunta (OPERACIONES COMBINADAS)
+    // =============================================================================
+    // Se deja la lógica original para generar la expresión:
     function generateQuestion() {
       const ops = ["+", "-", "*"];
       let a, b, c, op1, op2, calcExpression, displayExpression, structure;
@@ -310,33 +319,30 @@
         op2 = ops[Math.floor(Math.random() * ops.length)];
         structure = Math.random() < 0.5 ? 0 : 1; // 0: (a op1 b) op2 c, 1: a op1 (b op2 c)
         if (structure === 0) {
-          // Estructura: (a op1 b) op2 c
           if (op1 === '-' && a < b) { let temp = a; a = b; b = temp; }
           let part1 = eval(`${a} ${op1} ${b}`);
-          // Para resta en el segundo operador, aseguramos que part1 >= c
           if (op2 === '-' && part1 < c) {
             if (part1 > 0) {
               c = Math.floor(Math.random() * part1) + 1;
             } else {
-              continue; // si part1 es 0, volvemos a generar
+              continue;
             }
           }
           calcExpression = `(${a} ${op1} ${b}) ${op2} ${c}`;
-          // Se sale del bucle si el resultado final es no negativo
           if (eval(calcExpression) >= 0) break;
         } else {
-          // Estructura: a op1 (b op2 c)
           if (op2 === '-' && b < c) { let temp = b; b = c; c = temp; }
           let part2 = eval(`${b} ${op2} ${c}`);
           if (op1 === '-' && a < part2) {
-            a = Math.floor(Math.random() * 10) + part2; // Aseguramos que a >= part2
+            a = Math.floor(Math.random() * 10) + part2;
           }
           calcExpression = `${a} ${op1} (${b} ${op2} ${c})`;
           if (eval(calcExpression) >= 0) break;
         }
       }
       correctAnswer = eval(calcExpression);
-      // Preparar la expresión para mostrar (reemplazando "*" por "x")
+      
+      // Para mostrar
       const displayOp1 = op1 === "*" ? "x" : op1;
       const displayOp2 = op2 === "*" ? "x" : op2;
       if (structure === 0) {
@@ -345,6 +351,8 @@
         displayExpression = `${a} ${displayOp1} (${b} ${displayOp2} ${c})`;
       }
       questionText = `¿Cuánto es ${displayExpression}?`;
+      
+      // Panel de la pregunta
       if (questionMesh) {
         scene.remove(questionMesh);
         questionMesh = null;
@@ -353,21 +361,20 @@
       updateAnswerObjects();
       beepPlayed = false;
     }
-    
-    // Función para actualizar el panel de pregunta con mayor resolución,
-    // ajustando dinámicamente el tamaño de la fuente para que la pregunta quepa en el recuadro azul.
+
+    // Panel de pregunta sin sombras
     function updateQuestionPanel() {
       const canvas = document.createElement('canvas');
       canvas.width = 512 * resolutionFactor;
       canvas.height = 128 * resolutionFactor;
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-      ctx.shadowBlur = 10 * resolutionFactor;
+
+      // Quitar sombras
       ctx.fillStyle = "#007BFF";
       drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
-      ctx.shadowBlur = 0;
-      // Ajuste de la fuente para que el texto quepa en el recuadro
+
+      // Ajuste de fuente
       let fontSize = 48 * resolutionFactor;
       ctx.font = 'Bold ' + fontSize + 'px Arial';
       const maxWidth = canvas.width * 0.9;
@@ -379,6 +386,7 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(questionText, canvas.width / 2, canvas.height / 2);
+
       const texture = new THREE.CanvasTexture(canvas);
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
@@ -394,23 +402,25 @@
       }
     }
     
-    // Función para crear los paneles de respuestas con mayor resolución
+    // =============================================================================
+    // 7. Creación de paneles de respuesta sin sombras
+    // =============================================================================
     function createAnswerObjects(numAnswers, initialCreation) {
+      const minArc = 1.39626;
+      const maxArc = Math.PI;
+      let arcAngle;
+      if (numAnswers <= 4) {
+        arcAngle = minArc;
+      } else if (numAnswers >= 10) {
+        arcAngle = maxArc;
+      } else {
+        arcAngle = minArc + ((numAnswers - 4) / (10 - 4)) * (maxArc - minArc);
+      }
+      const angleStart = -arcAngle / 2;
+      const angleEnd = arcAngle / 2;
+      const radius = 0.8;
+      
       if (initialCreation) {
-        const minArc = 1.39626;
-        const maxArc = Math.PI;
-        let arcAngle;
-        if (numAnswers <= 4) {
-          arcAngle = minArc;
-        } else if (numAnswers >= 10) {
-          arcAngle = maxArc;
-        } else {
-          arcAngle = minArc + ((numAnswers - 4) / (10 - 4)) * (maxArc - minArc);
-        }
-        const angleStart = -arcAngle / 2;
-        const angleEnd = arcAngle / 2;
-        const radius = 0.8;
-        
         if (originalAnswerTransforms === null) {
           originalAnswerTransforms = [];
           for (let i = 0; i < numAnswers; i++) {
@@ -419,15 +429,15 @@
             canvas.height = 256 * resolutionFactor;
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-            ctx.shadowBlur = 10 * resolutionFactor;
+
+            // Sin sombras
             ctx.fillStyle = "#007BFF";
             drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
-            ctx.shadowBlur = 0;
             ctx.font = 'Bold ' + (75 * resolutionFactor) + 'px Arial';
             ctx.fillStyle = "#FFFFFF";
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            
             const wrongAnswers = new Set();
             while (wrongAnswers.size < (numAnswers - 1)) {
               let wrong = Math.floor(Math.random() * 100) + 1;
@@ -439,7 +449,7 @@
             const texture = new THREE.CanvasTexture(canvas);
             texture.minFilter = THREE.LinearFilter;
             texture.magFilter = THREE.LinearFilter;
-            const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+            const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
             const geometry = new THREE.PlaneGeometry(0.15, 0.15);
             const mesh = new THREE.Mesh(geometry, material);
             const angle = angleStart + (angleEnd - angleStart) * (i / (numAnswers - 1));
@@ -465,15 +475,15 @@
             canvas.height = 256 * resolutionFactor;
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-            ctx.shadowBlur = 10 * resolutionFactor;
+
+            // Sin sombras
             ctx.fillStyle = "#007BFF";
             drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
-            ctx.shadowBlur = 0;
             ctx.font = 'Bold ' + (75 * resolutionFactor) + 'px Arial';
             ctx.fillStyle = "#FFFFFF";
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            
             const wrongAnswers = new Set();
             while (wrongAnswers.size < (numAnswers - 1)) {
               let wrong = Math.floor(Math.random() * 100) + 1;
@@ -485,7 +495,7 @@
             const texture = new THREE.CanvasTexture(canvas);
             texture.minFilter = THREE.LinearFilter;
             texture.magFilter = THREE.LinearFilter;
-            const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+            const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
             const geometry = new THREE.PlaneGeometry(0.15, 0.15);
             const mesh = new THREE.Mesh(geometry, material);
             mesh.position.copy(originalAnswerTransforms[i].position);
@@ -509,12 +519,38 @@
         }
       }
     }
-    
+
     function updateAnswerObjects() {
       createAnswerObjects(selectedNumAnswers, false);
     }
+
+    // =============================================================================
+    // 8. Chispas redondas, blancas con blending aditivo
+    // =============================================================================
+    // a) Creamos la textura circular con degradado radial
+    function createCircleTexture() {
+      const size = 128;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, size, size);
+      // Degradado radial: centro opaco, bordes transparentes
+      const gradient = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, size, size);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      return texture;
+    }
+
+    // b) Definimos la textura para las chispas
+    const sparkTexture = createCircleTexture();
     
-    // Función para crear efecto de chispas
+    // c) Efecto de chispas con PointsMaterial aditivo
     function createSparksEffect(position) {
       const count = 100;
       const positions = new Float32Array(count * 3);
@@ -531,7 +567,17 @@
       }
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      const material = new THREE.PointsMaterial({ color: 0xffaa00, size: 0.02 });
+      const material = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.02,
+        map: sparkTexture,
+        transparent: true,
+        opacity: 1.0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        alphaTest: 0.5,
+        sizeAttenuation: true,
+      });
       const points = new THREE.Points(geometry, material);
       scene.add(points);
       sparksSystems.push({
@@ -541,7 +587,10 @@
         lastUpdate: performance.now()
       });
     }
-    
+
+    // =============================================================================
+    // 9. Bucle de animación
+    // =============================================================================
     function animate() {
       renderer.setAnimationLoop(render);
     }
@@ -549,11 +598,10 @@
     function render(timestamp, xrFrame) {
       renderer.render(scene, camera);
       
-      // Inicia el countdown y el audio en el primer frame en que la escena ya se mostró
       if (gameReady && !countdownStarted) {
         startCountdown();
         const timerSound = document.getElementById('timerSound');
-        timerSound.loop = false; // No repetir el audio
+        timerSound.loop = false;
         timerSound.play().catch(e => console.error(e));
         countdownStarted = true;
       }
@@ -570,6 +618,7 @@
           positions[j * 3 + 2] += system.velocities[j].z * dt;
         }
         system.points.geometry.attributes.position.needsUpdate = true;
+        // Remover las chispas tras 2 segundos
         if (currentTime - system.startTime > 2000) {
           scene.remove(system.points);
           sparksSystems.splice(i, 1);
@@ -649,7 +698,6 @@
           }
         }
       } else {
-        // En game over, solo se mantiene el botón de Reiniciar
         if (restartButtonMesh) {
           const buttonPos = new THREE.Vector3();
           restartButtonMesh.getWorldPosition(buttonPos);
@@ -673,20 +721,18 @@
       }
     }
     
+    // =============================================================================
+    // 10. Lógica para terminar y reiniciar el juego
+    // =============================================================================
     function endGame() {
       gameOver = true;
-      // Se elimina la pausa del audio, de modo que éste siga hasta su final sin reiniciarse
-      // const timerSound = document.getElementById('timerSound');
-      // timerSound.pause();
-      // timerSound.currentTime = 0;
       
       if (questionMesh) scene.remove(questionMesh);
       if (countdownMesh) scene.remove(countdownMesh);
-      // Se elimina el marcador que se muestra durante el juego
       if (scoreMesh) scene.remove(scoreMesh);
       answers.forEach(panel => scene.remove(panel));
       
-      // Cuadro final de resultados con mayor resolución (solo se muestra el cuadro azul)
+      // Panel final sin sombras
       const gameOverCanvas = document.createElement('canvas');
       gameOverCanvas.width = 256 * resolutionFactor;
       gameOverCanvas.height = 128 * resolutionFactor;
@@ -710,7 +756,6 @@
       finalMessageMesh.position.set(0, 0, -0.8);
       scene.add(finalMessageMesh);
       
-      // Se crea solo el botón de Reiniciar, posicionado un poco más arriba (por ejemplo, en y = -0.3)
       restartButtonMesh = createButton("Reiniciar");
       restartButtonMesh.position.set(0, -0.3, -0.8);
       scene.add(restartButtonMesh);
@@ -737,9 +782,8 @@
     }
     
     function restartGame() {
-      if(finalMessageMesh) scene.remove(finalMessageMesh);
-      if(restartButtonMesh) scene.remove(restartButtonMesh);
-      
+      if (finalMessageMesh) scene.remove(finalMessageMesh);
+      if (restartButtonMesh) scene.remove(restartButtonMesh);
       if (questionMesh) {
         scene.remove(questionMesh);
         questionMesh = null;
@@ -754,105 +798,102 @@
       answers = [];
       
       createAnswerObjects(selectedNumAnswers, true);
-      
       generateQuestion();
-      // Reiniciamos variables para iniciar el countdown y el audio de nuevo en el primer frame renderizado
       countdownStarted = false;
       gameReady = true;
       createScoreDisplay();
       
       const timerSound = document.getElementById('timerSound');
       timerSound.currentTime = 0;
-      timerSound.loop = false; // No repetir el audio
+      timerSound.loop = false;
       timerSound.play().catch(e => console.error(e));
     }
     
-    // Listener para desbloquear el audio en dispositivos móviles (se ejecuta solo una vez)
-    window.addEventListener('touchstart', function unlockAudio() {
-      const successEl = document.getElementById('successSound');
-      const errorEl = document.getElementById('errorSound');
-      [successEl, errorEl].forEach(audioEl => {
-        audioEl.play().then(() => {
-          audioEl.pause();
-          audioEl.currentTime = 0;
-        }).catch(e => console.error(e));
-      });
-    }, { once: true });
+    // Desbloquear audio en móviles
+    window.addEventListener(
+      'touchstart',
+      function unlockAudio() {
+        const successEl = document.getElementById('successSound');
+        const errorEl = document.getElementById('errorSound');
+        [successEl, errorEl].forEach((audioEl) => {
+          audioEl
+            .play()
+            .then(() => {
+              audioEl.pause();
+              audioEl.currentTime = 0;
+            })
+            .catch((e) => console.error(e));
+        });
+      },
+      { once: true }
+    );
     
-    // Listener adicional para detectar toques en la pantalla y procesar la respuesta
-    window.addEventListener('touchstart', function(event) {
-      // Solo aplicar en móviles
-      if (!/Mobi|Android/i.test(navigator.userAgent)) return;
-      
-      // Convertir la posición del toque a coordenadas normalizadas (NDC)
-      const touch = event.touches[0];
-      const x = (touch.clientX / window.innerWidth) * 2 - 1;
-      const y = - (touch.clientY / window.innerHeight) * 2 + 1;
-      const mouseVector = new THREE.Vector2(x, y);
-      
-      // Crear el raycaster y configurarlo con la cámara
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(mouseVector, camera);
-      
-      // Determinar qué objetos comprobar según si el juego está activo o finalizado
-      let objectsToIntersect = [];
-      if (!gameOver) {
-        objectsToIntersect = answers;
-      } else {
-        if (restartButtonMesh) {
-          objectsToIntersect = [restartButtonMesh];
-        }
-      }
-      
-      // Realizar la intersección
-      const intersects = raycaster.intersectObjects(objectsToIntersect);
-      
-      if (intersects.length > 0 && !hasCollided) {
-        const panel = intersects[0].object;
-        hasCollided = true;
+    // Listener adicional para toques (solo en móviles) para procesar la respuesta
+    window.addEventListener(
+      'touchstart',
+      function (event) {
+        if (!/Mobi|Android/i.test(navigator.userAgent)) return;
+        const touch = event.touches[0];
+        const x = (touch.clientX / window.innerWidth) * 2 - 1;
+        const y = -(touch.clientY / window.innerHeight) * 2 + 1;
+        const mouseVector = new THREE.Vector2(x, y);
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(mouseVector, camera);
+        let objectsToIntersect = [];
         if (!gameOver) {
-          // Verificar si la respuesta es correcta
-          if (panel.userData.answer === correctAnswer) {
-            correctCount++;
+          objectsToIntersect = answers;
+        } else {
+          if (restartButtonMesh) {
+            objectsToIntersect = [restartButtonMesh];
+          }
+        }
+        const intersects = raycaster.intersectObjects(objectsToIntersect);
+        if (intersects.length > 0 && !hasCollided) {
+          const panel = intersects[0].object;
+          hasCollided = true;
+          if (!gameOver) {
+            if (panel.userData.answer === correctAnswer) {
+              correctCount++;
+              const successSound = document.getElementById('successSound');
+              const successClone = successSound.cloneNode();
+              successClone.play().catch((e) => console.error(e));
+              createSparksEffect(panel.position);
+              if (questionMesh) questionMesh.visible = false;
+              answers.forEach((a) => (a.visible = false));
+              setTimeout(() => {
+                if (!gameOver) {
+                  generateQuestion();
+                  if (questionMesh) questionMesh.visible = true;
+                  answers.forEach((a) => (a.visible = true));
+                }
+                hasCollided = false;
+              }, 1000);
+            } else {
+              wrongCount++;
+              const errorSound = document.getElementById('errorSound');
+              const errorClone = errorSound.cloneNode();
+              errorClone.play().catch((e) => console.error(e));
+              answers.forEach((a) => a.material.color.set(0xff0000));
+              setTimeout(() => {
+                answers.forEach((a) => a.material.color.set(0xffffff));
+                hasCollided = false;
+              }, 500);
+            }
+          } else {
             const successSound = document.getElementById('successSound');
             const successClone = successSound.cloneNode();
-            successClone.play().catch(e => console.error(e));
+            successClone.play().catch((e) => console.error(e));
             createSparksEffect(panel.position);
-            if (questionMesh) questionMesh.visible = false;
-            answers.forEach(a => a.visible = false);
+            panel.visible = false;
             setTimeout(() => {
-              if (!gameOver) {
-                generateQuestion();
-                if (questionMesh) questionMesh.visible = true;
-                answers.forEach(a => a.visible = true);
-              }
+              restartGame();
               hasCollided = false;
             }, 1000);
-          } else {
-            wrongCount++;
-            const errorSound = document.getElementById('errorSound');
-            const errorClone = errorSound.cloneNode();
-            errorClone.play().catch(e => console.error(e));
-            answers.forEach(a => a.material.color.set(0xff0000));
-            setTimeout(() => {
-              answers.forEach(a => a.material.color.set(0xffffff));
-              hasCollided = false;
-            }, 500);
           }
-        } else {
-          // En game over, se procesa el botón de Reiniciar
-          const successSound = document.getElementById('successSound');
-          const successClone = successSound.cloneNode();
-          successClone.play().catch(e => console.error(e));
-          createSparksEffect(panel.position);
-          panel.visible = false;
-          setTimeout(() => {
-            restartGame();
-            hasCollided = false;
-          }, 1000);
         }
-      }
-    }, false);
+      },
+      false
+    );
     
     init();
     animate();
