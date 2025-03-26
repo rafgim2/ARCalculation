@@ -77,45 +77,44 @@
     let questionMesh = null;
     let questionText = "";
     const collisionThreshold = 0.2;
-    // Array que manejará las partículas de chispas
+    // Sistemas de chispas
     const sparksSystems = [];
     
-    // Contadores de aciertos y fallos
+    // Contadores
     let correctCount = 0;
     let wrongCount = 0;
     
-    // Variables para el tiempo de juego
+    // Tiempo de juego
     let gameStartTime = 0;
     const gameDuration = 60; // segundos
     let gameOver = false;
     
-    // Mallas en AR: cuenta atrás y score
+    // Mallas de AR
     let countdownMesh = null, countdownCanvas = null, countdownCtx = null, countdownTexture = null;
     let scoreMesh = null, scoreCanvas = null, scoreCtx = null, scoreTexture = null;
     
-    // Botón final: Reiniciar
+    // Botón final
     let restartButtonMesh = null, finalMessageMesh = null;
     
-    // Número de respuestas seleccionado
+    // Número de respuestas
     let selectedNumAnswers = 4;
     
-    // Almacenar la posición y orientación originales de cada panel
+    // Transformaciones originales para paneles de respuestas
     let originalAnswerTransforms = null;
     
-    // Variable para controlar el beep
+    // Control beep
     let beepPlayed = false;
     
-    // Variables para controlar el inicio del countdown y audio
+    // Control de inicio
     let gameReady = false;
     let countdownStarted = false;
     
-    // Factor para mejorar la resolución de los canvas
+    // Factor de resolución
     const resolutionFactor = 4;
 
-    // =============================================================================
-    // 1. Quitar sombras de los paneles (pregunta, respuestas y panel final)
-    // =============================================================================
-    // Función para dibujar un rectángulo redondeado SIN SOMBRAS
+    // ============================================================================
+    // Quitar sombras en paneles
+    // ============================================================================
     function drawRoundedRect(ctx, x, y, width, height, radius) {
       ctx.beginPath();
       ctx.moveTo(x + radius, y);
@@ -131,25 +130,23 @@
       ctx.fill();
     }
     
-    // =============================================================================
-    // 2. Panel de respuesta sin sombras
-    // =============================================================================
     function updateAnswerPanel(mesh, value) {
-      // Sin sombras
       const canvas = document.createElement('canvas');
       canvas.width = 256 * resolutionFactor;
       canvas.height = 256 * resolutionFactor;
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+
+      // Sin sombras
       ctx.fillStyle = "#007BFF";
       drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
+
       ctx.font = 'Bold ' + (75 * resolutionFactor) + 'px Arial';
       ctx.fillStyle = "#FFFFFF";
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(value, canvas.width / 2, canvas.height / 2);
-      
+
       const texture = new THREE.CanvasTexture(canvas);
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
@@ -158,9 +155,6 @@
       mesh.userData.answer = value;
     }
 
-    // =============================================================================
-    // 3. Creación y manejo de la escena
-    // =============================================================================
     function init() {
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
@@ -177,7 +171,7 @@
       
       window.addEventListener('resize', onWindowResize, false);
       
-      // Creamos el overlay inicial
+      // Overlay inicial
       const overlay = document.createElement('div');
       overlay.id = 'overlay';
       overlay.innerHTML =
@@ -196,7 +190,6 @@
           '</select>' +
         '</div>';
       
-      // Crear el botón AR con estilos
       const arButton = ARButton.createButton(renderer, { requiredFeatures });
       if (arButton.parentNode) {
         arButton.parentNode.removeChild(arButton);
@@ -230,9 +223,6 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     }
     
-    // =============================================================================
-    // 4. Conteo regresivo sin sombras
-    // =============================================================================
     function startCountdown() {
       gameStartTime = performance.now();
       countdownCanvas = document.createElement('canvas');
@@ -249,9 +239,6 @@
       scene.add(countdownMesh);
     }
 
-    // =============================================================================
-    // 5. Visualización del score
-    // =============================================================================
     function createScoreDisplay() {
       scoreCanvas = document.createElement('canvas');
       scoreCanvas.width = 256 * resolutionFactor;
@@ -304,10 +291,7 @@
       scoreTexture.needsUpdate = true;
     }
     
-    // =============================================================================
-    // 6. Generar la pregunta (OPERACIONES COMBINADAS)
-    // =============================================================================
-    // Se deja la lógica original para generar la expresión:
+    // Generar la pregunta con operaciones combinadas
     function generateQuestion() {
       const ops = ["+", "-", "*"];
       let a, b, c, op1, op2, calcExpression, displayExpression, structure;
@@ -341,8 +325,6 @@
         }
       }
       correctAnswer = eval(calcExpression);
-      
-      // Para mostrar
       const displayOp1 = op1 === "*" ? "x" : op1;
       const displayOp2 = op2 === "*" ? "x" : op2;
       if (structure === 0) {
@@ -352,7 +334,6 @@
       }
       questionText = `¿Cuánto es ${displayExpression}?`;
       
-      // Panel de la pregunta
       if (questionMesh) {
         scene.remove(questionMesh);
         questionMesh = null;
@@ -370,11 +351,10 @@
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Quitar sombras
+      // Sin sombras
       ctx.fillStyle = "#007BFF";
       drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
-
-      // Ajuste de fuente
+      
       let fontSize = 48 * resolutionFactor;
       ctx.font = 'Bold ' + fontSize + 'px Arial';
       const maxWidth = canvas.width * 0.9;
@@ -402,9 +382,7 @@
       }
     }
     
-    // =============================================================================
-    // 7. Creación de paneles de respuesta sin sombras
-    // =============================================================================
+    // Paneles de respuesta sin sombras
     function createAnswerObjects(numAnswers, initialCreation) {
       const minArc = 1.39626;
       const maxArc = Math.PI;
@@ -476,7 +454,6 @@
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Sin sombras
             ctx.fillStyle = "#007BFF";
             drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
             ctx.font = 'Bold ' + (75 * resolutionFactor) + 'px Arial';
@@ -524,10 +501,9 @@
       createAnswerObjects(selectedNumAnswers, false);
     }
 
-    // =============================================================================
-    // 8. Chispas redondas, blancas con blending aditivo
-    // =============================================================================
-    // a) Creamos la textura circular con degradado radial
+    // ============================================================================
+    // Chispas con degradado radial y blending aditivo
+    // ============================================================================
     function createCircleTexture() {
       const size = 128;
       const canvas = document.createElement('canvas');
@@ -535,7 +511,6 @@
       canvas.height = size;
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, size, size);
-      // Degradado radial: centro opaco, bordes transparentes
       const gradient = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
       gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
       gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
@@ -547,10 +522,8 @@
       return texture;
     }
 
-    // b) Definimos la textura para las chispas
     const sparkTexture = createCircleTexture();
     
-    // c) Efecto de chispas con PointsMaterial aditivo
     function createSparksEffect(position) {
       const count = 100;
       const positions = new Float32Array(count * 3);
@@ -588,9 +561,9 @@
       });
     }
 
-    // =============================================================================
-    // 9. Bucle de animación
-    // =============================================================================
+    // ============================================================================
+    // Render loop con FADING en los ultimos 300ms (1700ms-2000ms)
+    // ============================================================================
     function animate() {
       renderer.setAnimationLoop(render);
     }
@@ -618,8 +591,15 @@
           positions[j * 3 + 2] += system.velocities[j].z * dt;
         }
         system.points.geometry.attributes.position.needsUpdate = true;
-        // Remover las chispas tras 2 segundos
-        if (currentTime - system.startTime > 2000) {
+
+        // Añadimos el fade out en los últimos 300ms: de 1700 a 2000ms
+        let life = currentTime - system.startTime;
+        if (life > 1700) {
+          let fadeTime = life - 1700;
+          let fadeFactor = Math.max(0, 1 - (fadeTime / 300));
+          system.points.material.opacity = fadeFactor;
+        }
+        if (life > 2000) {
           scene.remove(system.points);
           sparksSystems.splice(i, 1);
         }
@@ -721,18 +701,13 @@
       }
     }
     
-    // =============================================================================
-    // 10. Lógica para terminar y reiniciar el juego
-    // =============================================================================
     function endGame() {
       gameOver = true;
-      
       if (questionMesh) scene.remove(questionMesh);
       if (countdownMesh) scene.remove(countdownMesh);
       if (scoreMesh) scene.remove(scoreMesh);
       answers.forEach(panel => scene.remove(panel));
       
-      // Panel final sin sombras
       const gameOverCanvas = document.createElement('canvas');
       gameOverCanvas.width = 256 * resolutionFactor;
       gameOverCanvas.height = 128 * resolutionFactor;
@@ -809,7 +784,6 @@
       timerSound.play().catch(e => console.error(e));
     }
     
-    // Desbloquear audio en móviles
     window.addEventListener(
       'touchstart',
       function unlockAudio() {
@@ -828,7 +802,6 @@
       { once: true }
     );
     
-    // Listener adicional para toques (solo en móviles) para procesar la respuesta
     window.addEventListener(
       'touchstart',
       function (event) {
