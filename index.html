@@ -111,7 +111,7 @@
     
     // Factor de resolución
     const resolutionFactor = 4;
-
+    
     // ============================================================================
     // Quitar sombras en paneles
     // ============================================================================
@@ -136,17 +136,17 @@
       canvas.height = 256 * resolutionFactor;
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+    
       // Sin sombras
       ctx.fillStyle = "#007BFF";
       drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
-
+    
       ctx.font = 'Bold ' + (75 * resolutionFactor) + 'px Arial';
       ctx.fillStyle = "#FFFFFF";
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(value, canvas.width / 2, canvas.height / 2);
-
+    
       const texture = new THREE.CanvasTexture(canvas);
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
@@ -154,7 +154,7 @@
       mesh.material.needsUpdate = true;
       mesh.userData.answer = value;
     }
-
+    
     function init() {
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
@@ -238,7 +238,7 @@
       countdownMesh.position.set(0, 0.50, -0.82);
       scene.add(countdownMesh);
     }
-
+    
     function createScoreDisplay() {
       scoreCanvas = document.createElement('canvas');
       scoreCanvas.width = 256 * resolutionFactor;
@@ -253,7 +253,7 @@
       scoreMesh.position.set(0, -0.2, -0.82);
       scene.add(scoreMesh);
     }
-
+    
     function updateCountdown() {
       const elapsed = (performance.now() - gameStartTime) / 1000;
       const remaining = Math.max(0, gameDuration - elapsed);
@@ -342,7 +342,7 @@
       updateAnswerObjects();
       beepPlayed = false;
     }
-
+    
     // Panel de pregunta sin sombras
     function updateQuestionPanel() {
       const canvas = document.createElement('canvas');
@@ -350,7 +350,7 @@
       canvas.height = 128 * resolutionFactor;
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+    
       // Sin sombras
       ctx.fillStyle = "#007BFF";
       drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
@@ -366,7 +366,7 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(questionText, canvas.width / 2, canvas.height / 2);
-
+    
       const texture = new THREE.CanvasTexture(canvas);
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
@@ -407,7 +407,7 @@
             canvas.height = 256 * resolutionFactor;
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+    
             // Sin sombras
             ctx.fillStyle = "#007BFF";
             drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
@@ -453,7 +453,7 @@
             canvas.height = 256 * resolutionFactor;
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+    
             ctx.fillStyle = "#007BFF";
             drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
             ctx.font = 'Bold ' + (75 * resolutionFactor) + 'px Arial';
@@ -496,11 +496,11 @@
         }
       }
     }
-
+    
     function updateAnswerObjects() {
       createAnswerObjects(selectedNumAnswers, false);
     }
-
+    
     // ============================================================================
     // Chispas con degradado radial y blending aditivo
     // ============================================================================
@@ -521,7 +521,7 @@
       texture.magFilter = THREE.LinearFilter;
       return texture;
     }
-
+    
     const sparkTexture = createCircleTexture();
     
     function createSparksEffect(position) {
@@ -560,9 +560,9 @@
         lastUpdate: performance.now()
       });
     }
-
+    
     // ============================================================================
-    // Render loop con FADING en los ultimos 300ms (1700ms-2000ms)
+    // Render loop con FADING en los últimos 300ms (1700ms-2000ms)
     // ============================================================================
     function animate() {
       renderer.setAnimationLoop(render);
@@ -570,6 +570,14 @@
     
     function render(timestamp, xrFrame) {
       renderer.render(scene, camera);
+      
+      // Efecto de flotación para los paneles de respuesta
+      answers.forEach((mesh, index) => {
+        if (originalAnswerTransforms && originalAnswerTransforms[index]) {
+          const baseY = originalAnswerTransforms[index].position.y;
+          mesh.position.y = baseY + 0.02 * Math.sin(timestamp * 0.005 + index);
+        }
+      });
       
       if (gameReady && !countdownStarted) {
         startCountdown();
@@ -591,8 +599,7 @@
           positions[j * 3 + 2] += system.velocities[j].z * dt;
         }
         system.points.geometry.attributes.position.needsUpdate = true;
-
-        // Añadimos el fade out en los últimos 300ms: de 1700 a 2000ms
+    
         let life = currentTime - system.startTime;
         if (life > 1700) {
           let fadeTime = life - 1700;
@@ -653,12 +660,12 @@
                 successClone.play().catch(e => console.error(e));
                 createSparksEffect(panel.position);
                 if (questionMesh) questionMesh.visible = false;
-                answers.forEach(a => a.visible = false);
+                answers.forEach(a => (a.visible = false));
                 setTimeout(() => {
                   if (!gameOver) {
                     generateQuestion();
                     if (questionMesh) questionMesh.visible = true;
-                    answers.forEach(a => a.visible = true);
+                    answers.forEach(a => (a.visible = true));
                   }
                   hasCollided = false;
                 }, 1000);
