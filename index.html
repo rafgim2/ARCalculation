@@ -491,7 +491,7 @@
       const overlay = document.createElement('div');
       overlay.id = 'overlay';
       overlay.innerHTML =
-        '<img src="ARCalc.jpeg" alt="ARCalculation" style="margin-bottom:20px;">' +
+        '<img src="ARCalc.jpeg" alt="ARCalculation" style="margin-bottom:10px; margin-top:50px;">' +
         '<a href="https://www.youtube.com/@rafgim" target="_blank">© By Rafael Gimeno</a>' +
         '<div class="respuestas-container">' +
           '<label for="numAnswers">Respuestas:</label>' +
@@ -511,7 +511,7 @@
       // Se crea el ARButton y se añade al overlay (se corrige su posición para que sea visible)
       const arButton = ARButton.createButton(renderer, { requiredFeatures });
       arButton.style.position = 'absolute';
-      arButton.style.top = '450px';
+      arButton.style.top = '600px';
       arButton.style.left = 'calc(50% - 75px)';  /* Centrado, considerando ancho de 150px */
       arButton.style.width = '150px';
       arButton.style.height = '50px';
