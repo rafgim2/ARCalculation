@@ -277,11 +277,15 @@
     // Función para crear (o actualizar) los paneles de respuesta (manteniendo posiciones originales)
     // ============================================================================
     function createAnswerObjects(numAnswers, initialCreation) {
-      const minArc = 2;
-      const maxArc = Math.PI;
-      let arcAngle = (numAnswers <= 4) ? minArc : (numAnswers >= 10) ? maxArc : minArc + ((numAnswers - 4)/(10-4))*(maxArc-minArc);
-      const angleStart = -arcAngle;
-      const angleEnd = arcAngle;
+      // Valores para el ángulo medio (half-angle) en radianes:
+      // Para 4 respuestas: 40° (0.698132 rad), para 10: 90° (Math.PI/2)
+      const minHalfArc = 0.698132; // 40°
+      const maxHalfArc = Math.PI / 2; // 90°
+      let halfArc = (numAnswers <= 4) ? minHalfArc 
+                    : (numAnswers >= 10) ? maxHalfArc 
+                    : minHalfArc + ((numAnswers - 4) / (10 - 4)) * (maxHalfArc - minHalfArc);
+      const angleStart = -halfArc;
+      const angleEnd = halfArc;
       const radius = 0.8;
       
       if (initialCreation) {
