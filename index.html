@@ -22,6 +22,8 @@
       color: #fff;
       text-align: center;
       z-index: 10;
+      box-sizing: border-box;
+      padding: 20px;
     }
     #overlay a {
       font-size: 14px;
@@ -168,7 +170,6 @@
     let countdownMesh = null, countdownCanvas = null, countdownCtx = null, countdownTexture = null;
     let scoreMesh = null, scoreCanvas = null, scoreCtx = null, scoreTexture = null;
     let restartButtonMesh = null, finalMessageMesh = null;
-    // Botones de scroll para leaderboard final
     let scrollUpButtonMesh = null, scrollDownButtonMesh = null;
     let selectedNumAnswers = 4;
     let originalAnswerTransforms = null;
@@ -176,7 +177,7 @@
     let gameReady = false;
     let countdownStarted = false;
     const resolutionFactor = 4;
-    // Variables para leaderboard final en AR
+    // Leaderboard final en AR
     let leaderboardMesh = null;
     let leaderboardResults = [];
     let scoreboardStartIndex = 0;
@@ -185,6 +186,8 @@
     // Para medir tiempos de respuesta
     let currentQuestionStartTime = 0;
     let correctResponseTimes = [];
+    // Campo para nombre de jugador (se añadirá en el overlay)
+    let playerName = "";
     
     // ============================================================================
     // Función para dibujar rectángulo redondeado (sin sombras)
@@ -229,7 +232,7 @@
     }
     
     // ============================================================================
-    // Inicialización de la escena, cámara, renderer y overlay
+    // Inicialización de la escena, cámara, renderer y overlay (con campo para nombre)
     // ============================================================================
     function init() {
       scene = new THREE.Scene();
@@ -246,7 +249,7 @@
       
       window.addEventListener('resize', onWindowResize, false);
       
-      // Overlay inicial (incluye selector de respuestas y tabla preview)
+      // Overlay inicial: se agrega selector de respuestas, tabla preview y campo para nombre
       const overlay = document.createElement('div');
       overlay.id = 'overlay';
       overlay.innerHTML =
@@ -264,7 +267,8 @@
             '<option value="10">10</option>' +
           '</select>' +
         '</div>' +
-        '<div id="leaderboardPreview"></div>';
+        '<div id="leaderboardPreview"></div>' +
+        '<input type="text" id="playerName" placeholder="Ingresa tu nombre" style="padding:10px; font-size:16px; margin-bottom:20px;" maxlength="10">';
       
       const arButton = ARButton.createButton(renderer, { requiredFeatures });
       if (arButton.parentNode) {
@@ -290,6 +294,8 @@
       updateLeaderboardPreview(4);
       
       renderer.xr.addEventListener('sessionstart', () => {
+        // Al iniciar la sesión AR, se toma el nombre ingresado
+        playerName = document.getElementById('playerName').value || "Jugador";
         selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
         createAnswerObjects(selectedNumAnswers, true);
         overlay.remove();
@@ -320,7 +326,7 @@
       const geometry = new THREE.PlaneGeometry(0.6, 0.3);
       const material = new THREE.MeshBasicMaterial({ map: countdownTexture, transparent: true });
       countdownMesh = new THREE.Mesh(geometry, material);
-      // Posición original del countdown en ARCalculation
+      // Posición original del countdown
       countdownMesh.position.set(0, 0.50, -0.82);
       scene.add(countdownMesh);
     }
@@ -428,11 +434,6 @@
     }
     
     // ============================================================================
-    // Panel de pregunta: se mantiene posición original (0,0.3,-0.8)
-    // ============================================================================
-    // Ya definida en updateQuestionPanel() (sin sombras)
-    
-    // ============================================================================
     // Creación de paneles de respuesta: se sitúan igual que en el código original
     // ============================================================================
     function createAnswerObjects(numAnswers, initialCreation) {
@@ -465,7 +466,6 @@
             ctx.fillStyle = "#FFFFFF";
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            // Para la primera creación, se asigna una respuesta aleatoria (correcta o no)
             const wrongAnswers = new Set();
             while (wrongAnswers.size < (numAnswers - 1)) {
               let wrong = Math.floor(Math.random() * 100) + 1;
@@ -480,8 +480,7 @@
             const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
             const geometry = new THREE.PlaneGeometry(0.15, 0.15);
             const mesh = new THREE.Mesh(geometry, material);
-    
-            // Se calcula la posición a partir de la posición central de la cámara inicial
+            // Se sitúa la respuesta usando la posición central de la cámara
             const centerPos = new THREE.Vector3().copy(camera.position);
             centerPos.add(new THREE.Vector3(0, 0, -0.8));
             const angle = angleStart + (angleEnd - angleStart) * (i / (numAnswers - 1));
@@ -554,7 +553,7 @@
     }
     
     // ============================================================================
-    // Efecto chispas (con degradado radial)
+    // Efecto chispas
     // ============================================================================
     function createCircleTexture() {
       const size = 128;
@@ -614,7 +613,7 @@
     }
     
     // ============================================================================
-    // Bucle de renderizado (incluye detección de colisiones)
+    // Bucle de renderizado y detección de colisiones
     // ============================================================================
     function animate() {
       renderer.setAnimationLoop(render);
@@ -758,7 +757,7 @@
     }
     
     // ============================================================================
-    // Funciones para el leaderboard final en AR
+    // Leaderboard final en AR: mensaje final, leaderboard y botones de scroll
     // ============================================================================
     async function endGame() {
       gameOver = true;
@@ -767,7 +766,6 @@
       if (scoreMesh) scene.remove(scoreMesh);
       answers.forEach(panel => scene.remove(panel));
       
-      // Mostrar mensaje final en pantalla
       const gameOverCanvas = document.createElement('canvas');
       gameOverCanvas.width = 256 * resolutionFactor;
       gameOverCanvas.height = 128 * resolutionFactor;
@@ -791,8 +789,7 @@
       finalMessageMesh.position.set(0, 0, -0.8);
       scene.add(finalMessageMesh);
       
-      // Leaderboard: calcular puntaje final y subirlo
-      // Aquí se puede incluir medición de tiempo de respuesta si se requiere
+      // Cálculo de puntaje final restando la media de tiempos
       let avgTime = 0;
       if (correctResponseTimes.length > 0) {
         let sum = correctResponseTimes.reduce((a, b) => a + b, 0);
@@ -823,7 +820,7 @@
         });
       }
       
-      // Consultar el leaderboard completo y mostrarlo en AR con scroll
+      // Consultar y mostrar el leaderboard completo en AR con botones de scroll
       let qLeaderboard = query(
         collection(db, collectionName),
         orderBy("score", "desc")
@@ -877,12 +874,668 @@
       leaderboardMesh.position.set(0, 0, -1.2);
       scene.add(leaderboardMesh);
       
-      // Botón reiniciar
       restartButtonMesh = createButton("Reiniciar");
       restartButtonMesh.position.set(0, -0.8, -1.1);
       scene.add(restartButtonMesh);
       
-      // Botones de scroll
+      scrollUpButtonMesh = createButton("▲", 0.1, 0.1);
+      scrollUpButtonMesh.position.set(-planeWidth * 0.5 - 0.1, planeHeight * 0.35, -1.1);
+      scene.add(scrollUpButtonMesh);
+      
+      scrollDownButtonMesh = createButton("▼", 0.1, 0.1);
+      scrollDownButtonMesh.position.set(-planeWidth * 0.5 - 0.1, -planeHeight * 0.35, -1.1);
+      scene.add(scrollDownButtonMesh);
+    }
+    
+    function drawLeaderboardSegment() {
+      if (!leaderboardMesh) return;
+      const { canvas, ctx, texture, planeWidth } = leaderboardMesh.userData;
+      const subset = leaderboardResults.slice(scoreboardStartIndex, scoreboardStartIndex + pageSize);
+      const lineHeight = 40 * resolutionFactor;
+      const extraLines = 4;
+      const canvasWidth = 512 * resolutionFactor;
+      const canvasHeight = lineHeight * (subset.length + extraLines);
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = 'Bold ' + (28 * resolutionFactor) + 'px Arial';
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Tabla de Clasificación", canvasWidth / 2, lineHeight);
+      const xPosPos = 0.10 * canvasWidth;
+      const xPosName = 0.40 * canvasWidth;
+      const xPosScore = 0.75 * canvasWidth;
+      let startY = lineHeight * 2.5;
+      ctx.font = 'Bold ' + (24 * resolutionFactor) + 'px Arial';
+      ctx.textAlign = "left";
+      ctx.fillText("Pos", xPosPos, startY);
+      ctx.fillText("Nombre", xPosName, startY);
+      ctx.fillText("Puntos", xPosScore, startY);
+      let yPos = startY + (1.5 * lineHeight);
+      for (let i = 0; i < subset.length; i++) {
+        const data = subset[i];
+        const realPos = data._index + 1;
+        if (playerPosition !== null && realPos === playerPosition) {
+          ctx.fillStyle = "green";
+          ctx.fillRect(0, yPos - lineHeight * 0.6, canvasWidth, lineHeight);
+          ctx.fillStyle = "#FFFFFF";
+        } else {
+          ctx.fillStyle = "#FFFFFF";
+        }
+        ctx.fillText(String(realPos), xPosPos, yPos);
+        ctx.fillText(data.name, xPosName, yPos);
+        ctx.fillText(String(data.score), xPosScore, yPos);
+        yPos += lineHeight;
+      }
+      if (playerPosition !== null) {
+        ctx.textAlign = "center";
+        ctx.fillText(`Tu posición: ${playerPosition}`, canvasWidth / 2, yPos + lineHeight);
+      }
+      texture.needsUpdate = true;
+      const planeHeight = planeWidth * (canvasHeight / canvasWidth);
+      leaderboardMesh.geometry.dispose();
+      leaderboardMesh.geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
+      leaderboardMesh.position.set(0, 0, -1.2);
+      restartButtonMesh.position.set(0, -planeHeight * 0.6, -1.1);
+      scrollUpButtonMesh.position.set(-planeWidth * 0.5 - 0.1, planeHeight * 0.35, -1.1);
+      scrollDownButtonMesh.position.set(-planeWidth * 0.5 - 0.1, -planeHeight * 0.35, -1.1);
+    }
+    
+    function createButton(text, planeWidth = 0.3, planeHeight = 0.1) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128 * resolutionFactor;
+      canvas.height = 64 * resolutionFactor;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = "#007BFF";
+      drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 10 * resolutionFactor);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = 'Bold ' + (18 * resolutionFactor) + 'px Arial';
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      const geom = new THREE.PlaneGeometry(planeWidth, planeHeight);
+      const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+      return new THREE.Mesh(geom, mat);
+    }
+    
+    // ============================================================================
+    // Eventos táctiles: desbloqueo de audio y raycasting para colisiones
+    // ============================================================================
+    window.addEventListener('touchstart', function unlockAudio() {
+      const successEl = document.getElementById('successSound');
+      const errorEl = document.getElementById('errorSound');
+      [successEl, errorEl].forEach(audioEl => {
+        audioEl.play().then(() => {
+          audioEl.pause();
+          audioEl.currentTime = 0;
+        }).catch(e => console.error(e));
+      });
+    }, { once: true });
+    
+    window.addEventListener('touchstart', function(event) {
+      if (!/Mobi|Android/i.test(navigator.userAgent)) return;
+      const touch = event.touches[0];
+      const x = (touch.clientX / window.innerWidth) * 2 - 1;
+      const y = - (touch.clientY / window.innerHeight) * 2 + 1;
+      const mouseVector = new THREE.Vector2(x, y);
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouseVector, camera);
+      let objectsToIntersect = [];
+      if (!gameOver) {
+        objectsToIntersect = answers;
+      } else {
+        if (restartButtonMesh) objectsToIntersect.push(restartButtonMesh);
+        if (scrollUpButtonMesh) objectsToIntersect.push(scrollUpButtonMesh);
+        if (scrollDownButtonMesh) objectsToIntersect.push(scrollDownButtonMesh);
+      }
+      const intersects = raycaster.intersectObjects(objectsToIntersect);
+      if (intersects.length > 0 && !hasCollided) {
+        const objHit = intersects[0].object;
+        hasCollided = true;
+        if (!gameOver) {
+          if (objHit.userData.answer === correctAnswer) {
+            correctCount++;
+            const successSound = document.getElementById('successSound');
+            const successClone = successSound.cloneNode();
+            successClone.play().catch(e => console.error(e));
+            createSparksEffect(objHit.position);
+            if (questionMesh) questionMesh.visible = false;
+            answers.forEach(a => (a.visible = false));
+            setTimeout(() => {
+              if (!gameOver) {
+                generateQuestion();
+                if (questionMesh) questionMesh.visible = true;
+                answers.forEach(a => (a.visible = true));
+              }
+              hasCollided = false;
+            }, 1000);
+          } else {
+            wrongCount++;
+            const errorSound = document.getElementById('errorSound');
+            const errorClone = errorSound.cloneNode();
+            errorClone.play().catch(e => console.error(e));
+            answers.forEach(a => a.material.color.set(0xff0000));
+            setTimeout(() => {
+              answers.forEach(a => a.material.color.set(0xffffff));
+              hasCollided = false;
+            }, 500);
+          }
+        } else {
+          if (objHit === restartButtonMesh) {
+            const successSound = document.getElementById('successSound');
+            const successClone = successSound.cloneNode();
+            successClone.play().catch(e => console.error(e));
+            createSparksEffect(objHit.position);
+            objHit.visible = false;
+            setTimeout(() => {
+              restartGame();
+              hasCollided = false;
+            }, 1000);
+          } else if (objHit === scrollUpButtonMesh) {
+            scoreboardStartIndex -= pageSize;
+            if (scoreboardStartIndex < 0) scoreboardStartIndex = 0;
+            drawLeaderboardSegment();
+            setTimeout(() => { hasCollided = false; }, 500);
+          } else if (objHit === scrollDownButtonMesh) {
+            scoreboardStartIndex += pageSize;
+            if (scoreboardStartIndex >= leaderboardResults.length) {
+              scoreboardStartIndex = leaderboardResults.length - pageSize;
+              if (scoreboardStartIndex < 0) scoreboardStartIndex = 0;
+            }
+            drawLeaderboardSegment();
+            setTimeout(() => { hasCollided = false; }, 500);
+          }
+        }
+      }
+    }, false);
+    
+    // ============================================================================
+    // Reiniciar juego (se eliminan mallas del leaderboard y botones)
+    // ============================================================================
+    function restartGame() {
+      if (finalMessageMesh) scene.remove(finalMessageMesh);
+      if (restartButtonMesh) scene.remove(restartButtonMesh);
+      if (leaderboardMesh) scene.remove(leaderboardMesh);
+      if (scrollUpButtonMesh) scene.remove(scrollUpButtonMesh);
+      if (scrollDownButtonMesh) scene.remove(scrollDownButtonMesh);
+      if (questionMesh) { scene.remove(questionMesh); questionMesh = null; }
+      
+      correctCount = 0;
+      wrongCount = 0;
+      gameStartTime = performance.now();
+      gameOver = false;
+      answers.forEach(panel => scene.remove(panel));
+      answers = [];
+      originalAnswerTransforms = null;
+      correctResponseTimes = [];
+      
+      createAnswerObjects(selectedNumAnswers, true);
+      generateQuestion();
+      countdownStarted = false;
+      gameReady = true;
+      createScoreDisplay();
+      
+      const timerSound = document.getElementById('timerSound');
+      timerSound.currentTime = 0;
+      timerSound.loop = false;
+      timerSound.play().catch(e => console.error(e));
+    }
+    
+    // ============================================================================
+    // Leaderboard final en AR: mensaje, tabla y botones de scroll
+    // ============================================================================
+    async function endGame() {
+      gameOver = true;
+      if (questionMesh) scene.remove(questionMesh);
+      if (countdownMesh) scene.remove(countdownMesh);
+      if (scoreMesh) scene.remove(scoreMesh);
+      answers.forEach(panel => scene.remove(panel));
+      
+      const gameOverCanvas = document.createElement('canvas');
+      gameOverCanvas.width = 256 * resolutionFactor;
+      gameOverCanvas.height = 128 * resolutionFactor;
+      const gameOverCtx = gameOverCanvas.getContext('2d');
+      gameOverCtx.fillStyle = "#007BFF";
+      drawRoundedRect(gameOverCtx, 0, 0, gameOverCanvas.width, gameOverCanvas.height, 10 * resolutionFactor);
+      gameOverCtx.fillStyle = "#FFFFFF";
+      gameOverCtx.font = 'Bold ' + (24 * resolutionFactor) + 'px Arial';
+      gameOverCtx.textAlign = "center";
+      gameOverCtx.textBaseline = "middle";
+      gameOverCtx.fillText("Fin del Juego", gameOverCanvas.width / 2, 30 * resolutionFactor);
+      gameOverCtx.font = 'Bold ' + (18 * resolutionFactor) + 'px Arial';
+      gameOverCtx.fillText(`Aciertos: ${correctCount}`, gameOverCanvas.width / 2, 65 * resolutionFactor);
+      gameOverCtx.fillText(`Fallos: ${wrongCount}`, gameOverCanvas.width / 2, 100 * resolutionFactor);
+      const gameOverTexture = new THREE.CanvasTexture(gameOverCanvas);
+      gameOverTexture.minFilter = THREE.LinearFilter;
+      gameOverTexture.magFilter = THREE.LinearFilter;
+      const geometry = new THREE.PlaneGeometry(0.5, 0.25);
+      const material = new THREE.MeshBasicMaterial({ map: gameOverTexture, transparent: true });
+      finalMessageMesh = new THREE.Mesh(geometry, material);
+      finalMessageMesh.position.set(0, 0, -0.8);
+      scene.add(finalMessageMesh);
+      
+      // Cálculo de la media de tiempos y puntaje final
+      let avgTime = 0;
+      if (correctResponseTimes.length > 0) {
+        let sum = correctResponseTimes.reduce((a, b) => a + b, 0);
+        avgTime = sum / correctResponseTimes.length / 1000;
+      }
+      const rawScore = (correctCount - wrongCount) - avgTime;
+      const finalScore = parseFloat(rawScore.toFixed(3));
+      const collectionName = `Calcleaderboard_${selectedNumAnswers}`;
+      
+      let docsFound = await getDocs(
+        query(
+          collection(db, collectionName),
+          where("name", "==", playerName),
+          limit(1)
+        )
+      );
+      if (!docsFound.empty) {
+        const docToUpdate = docsFound.docs[0];
+        await updateDoc(doc(db, collectionName, docToUpdate.id), {
+          score: finalScore,
+          timestamp: serverTimestamp()
+        });
+      } else {
+        await addDoc(collection(db, collectionName), {
+          name: playerName,
+          score: finalScore,
+          timestamp: serverTimestamp()
+        });
+      }
+      
+      // Consultar y mostrar el leaderboard completo en AR con scroll
+      let qLeaderboard = query(
+        collection(db, collectionName),
+        orderBy("score", "desc")
+      );
+      let querySnapshot;
+      try {
+        querySnapshot = await getDocs(qLeaderboard);
+      } catch (err) {
+        console.error("Error consultando el leaderboard:", err);
+        return;
+      }
+      leaderboardResults = [];
+      let idx = 0;
+      querySnapshot.forEach((docSnap) => {
+        let data = docSnap.data();
+        leaderboardResults.push({ ...data, _index: idx });
+        idx++;
+      });
+      let playerIndex = leaderboardResults.findIndex(
+        (r) => r.name === playerName && r.score === finalScore
+      );
+      playerPosition = (playerIndex >= 0) ? (playerIndex + 1) : null;
+      scoreboardStartIndex = playerIndex - Math.floor(pageSize / 2);
+      if (scoreboardStartIndex < 0) scoreboardStartIndex = 0;
+      if (scoreboardStartIndex >= leaderboardResults.length) {
+        scoreboardStartIndex = 0;
+      }
+      createLeaderboardMesh();
+      drawLeaderboardSegment();
+    }
+    
+    function createLeaderboardMesh() {
+      if (leaderboardMesh) { scene.remove(leaderboardMesh); leaderboardMesh = null; }
+      if (restartButtonMesh) { scene.remove(restartButtonMesh); restartButtonMesh = null; }
+      if (scrollUpButtonMesh) { scene.remove(scrollUpButtonMesh); scrollUpButtonMesh = null; }
+      if (scrollDownButtonMesh) { scene.remove(scrollDownButtonMesh); scrollDownButtonMesh = null; }
+      
+      const dummyCanvas = document.createElement('canvas');
+      dummyCanvas.width = 512;
+      dummyCanvas.height = 512;
+      const ctx = dummyCanvas.getContext('2d');
+      const lbTexture = new THREE.CanvasTexture(dummyCanvas);
+      lbTexture.minFilter = THREE.LinearFilter;
+      lbTexture.magFilter = THREE.LinearFilter;
+      const planeWidth = 1.2;
+      const planeHeight = 1.0;
+      const lbGeometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
+      const lbMaterial = new THREE.MeshBasicMaterial({ map: lbTexture, transparent: true });
+      leaderboardMesh = new THREE.Mesh(lbGeometry, lbMaterial);
+      leaderboardMesh.userData = { canvas: dummyCanvas, ctx, texture: lbTexture, planeWidth, planeHeight };
+      leaderboardMesh.position.set(0, 0, -1.2);
+      scene.add(leaderboardMesh);
+      
+      restartButtonMesh = createButton("Reiniciar");
+      restartButtonMesh.position.set(0, -0.8, -1.1);
+      scene.add(restartButtonMesh);
+      
+      scrollUpButtonMesh = createButton("▲", 0.1, 0.1);
+      scrollUpButtonMesh.position.set(-planeWidth * 0.5 - 0.1, planeHeight * 0.35, -1.1);
+      scene.add(scrollUpButtonMesh);
+      
+      scrollDownButtonMesh = createButton("▼", 0.1, 0.1);
+      scrollDownButtonMesh.position.set(-planeWidth * 0.5 - 0.1, -planeHeight * 0.35, -1.1);
+      scene.add(scrollDownButtonMesh);
+    }
+    
+    function drawLeaderboardSegment() {
+      if (!leaderboardMesh) return;
+      const { canvas, ctx, texture, planeWidth } = leaderboardMesh.userData;
+      const subset = leaderboardResults.slice(scoreboardStartIndex, scoreboardStartIndex + pageSize);
+      const lineHeight = 40 * resolutionFactor;
+      const extraLines = 4;
+      const canvasWidth = 512 * resolutionFactor;
+      const canvasHeight = lineHeight * (subset.length + extraLines);
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = 'Bold ' + (28 * resolutionFactor) + 'px Arial';
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Tabla de Clasificación", canvasWidth / 2, lineHeight);
+      const xPosPos = 0.10 * canvasWidth;
+      const xPosName = 0.40 * canvasWidth;
+      const xPosScore = 0.75 * canvasWidth;
+      let startY = lineHeight * 2.5;
+      ctx.font = 'Bold ' + (24 * resolutionFactor) + 'px Arial';
+      ctx.textAlign = "left";
+      ctx.fillText("Pos", xPosPos, startY);
+      ctx.fillText("Nombre", xPosName, startY);
+      ctx.fillText("Puntos", xPosScore, startY);
+      let yPos = startY + (1.5 * lineHeight);
+      for (let i = 0; i < subset.length; i++) {
+        const data = subset[i];
+        const realPos = data._index + 1;
+        if (playerPosition !== null && realPos === playerPosition) {
+          ctx.fillStyle = "green";
+          ctx.fillRect(0, yPos - lineHeight * 0.6, canvasWidth, lineHeight);
+          ctx.fillStyle = "#FFFFFF";
+        } else {
+          ctx.fillStyle = "#FFFFFF";
+        }
+        ctx.fillText(String(realPos), xPosPos, yPos);
+        ctx.fillText(data.name, xPosName, yPos);
+        ctx.fillText(String(data.score), xPosScore, yPos);
+        yPos += lineHeight;
+      }
+      if (playerPosition !== null) {
+        ctx.textAlign = "center";
+        ctx.fillText(`Tu posición: ${playerPosition}`, canvasWidth / 2, yPos + lineHeight);
+      }
+      texture.needsUpdate = true;
+      const planeHeight = planeWidth * (canvasHeight / canvasWidth);
+      leaderboardMesh.geometry.dispose();
+      leaderboardMesh.geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
+      leaderboardMesh.position.set(0, 0, -1.2);
+      restartButtonMesh.position.set(0, -planeHeight * 0.6, -1.1);
+      scrollUpButtonMesh.position.set(-planeWidth * 0.5 - 0.1, planeHeight * 0.35, -1.1);
+      scrollDownButtonMesh.position.set(-planeWidth * 0.5 - 0.1, -planeHeight * 0.35, -1.1);
+    }
+    
+    function createButton(text, planeWidth = 0.3, planeHeight = 0.1) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128 * resolutionFactor;
+      canvas.height = 64 * resolutionFactor;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = "#007BFF";
+      drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 10 * resolutionFactor);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = 'Bold ' + (18 * resolutionFactor) + 'px Arial';
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      const geom = new THREE.PlaneGeometry(planeWidth, planeHeight);
+      const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+      return new THREE.Mesh(geom, mat);
+    }
+    
+    // ============================================================================
+    // Eventos táctiles: desbloqueo de audio y raycasting para colisiones
+    // ============================================================================
+    window.addEventListener('touchstart', function unlockAudio() {
+      const successEl = document.getElementById('successSound');
+      const errorEl = document.getElementById('errorSound');
+      [successEl, errorEl].forEach(audioEl => {
+        audioEl.play().then(() => {
+          audioEl.pause();
+          audioEl.currentTime = 0;
+        }).catch(e => console.error(e));
+      });
+    }, { once: true });
+    
+    window.addEventListener('touchstart', function(event) {
+      if (!/Mobi|Android/i.test(navigator.userAgent)) return;
+      const touch = event.touches[0];
+      const x = (touch.clientX / window.innerWidth) * 2 - 1;
+      const y = - (touch.clientY / window.innerHeight) * 2 + 1;
+      const mouseVector = new THREE.Vector2(x, y);
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouseVector, camera);
+      let objectsToIntersect = [];
+      if (!gameOver) {
+        objectsToIntersect = answers;
+      } else {
+        if (restartButtonMesh) objectsToIntersect.push(restartButtonMesh);
+        if (scrollUpButtonMesh) objectsToIntersect.push(scrollUpButtonMesh);
+        if (scrollDownButtonMesh) objectsToIntersect.push(scrollDownButtonMesh);
+      }
+      const intersects = raycaster.intersectObjects(objectsToIntersect);
+      if (intersects.length > 0 && !hasCollided) {
+        const objHit = intersects[0].object;
+        hasCollided = true;
+        if (!gameOver) {
+          if (objHit.userData.answer === correctAnswer) {
+            correctCount++;
+            const successSound = document.getElementById('successSound');
+            const successClone = successSound.cloneNode();
+            successClone.play().catch(e => console.error(e));
+            createSparksEffect(objHit.position);
+            if (questionMesh) questionMesh.visible = false;
+            answers.forEach(a => (a.visible = false));
+            setTimeout(() => {
+              if (!gameOver) {
+                generateQuestion();
+                if (questionMesh) questionMesh.visible = true;
+                answers.forEach(a => (a.visible = true));
+              }
+              hasCollided = false;
+            }, 1000);
+          } else {
+            wrongCount++;
+            const errorSound = document.getElementById('errorSound');
+            const errorClone = errorSound.cloneNode();
+            errorClone.play().catch(e => console.error(e));
+            answers.forEach(a => a.material.color.set(0xff0000));
+            setTimeout(() => {
+              answers.forEach(a => a.material.color.set(0xffffff));
+              hasCollided = false;
+            }, 500);
+          }
+        } else {
+          if (objHit === restartButtonMesh) {
+            const successSound = document.getElementById('successSound');
+            const successClone = successSound.cloneNode();
+            successClone.play().catch(e => console.error(e));
+            createSparksEffect(objHit.position);
+            objHit.visible = false;
+            setTimeout(() => {
+              restartGame();
+              hasCollided = false;
+            }, 1000);
+          } else if (objHit === scrollUpButtonMesh) {
+            scoreboardStartIndex -= pageSize;
+            if (scoreboardStartIndex < 0) scoreboardStartIndex = 0;
+            drawLeaderboardSegment();
+            setTimeout(() => { hasCollided = false; }, 500);
+          } else if (objHit === scrollDownButtonMesh) {
+            scoreboardStartIndex += pageSize;
+            if (scoreboardStartIndex >= leaderboardResults.length) {
+              scoreboardStartIndex = leaderboardResults.length - pageSize;
+              if (scoreboardStartIndex < 0) scoreboardStartIndex = 0;
+            }
+            drawLeaderboardSegment();
+            setTimeout(() => { hasCollided = false; }, 500);
+          }
+        }
+      }
+    }, false);
+    
+    // ============================================================================
+    // Reiniciar juego (se eliminan mallas del leaderboard y botones)
+    // ============================================================================
+    function restartGame() {
+      if (finalMessageMesh) scene.remove(finalMessageMesh);
+      if (restartButtonMesh) scene.remove(restartButtonMesh);
+      if (leaderboardMesh) scene.remove(leaderboardMesh);
+      if (scrollUpButtonMesh) scene.remove(scrollUpButtonMesh);
+      if (scrollDownButtonMesh) scene.remove(scrollDownButtonMesh);
+      if (questionMesh) { scene.remove(questionMesh); questionMesh = null; }
+      
+      correctCount = 0;
+      wrongCount = 0;
+      gameStartTime = performance.now();
+      gameOver = false;
+      answers.forEach(panel => scene.remove(panel));
+      answers = [];
+      originalAnswerTransforms = null;
+      correctResponseTimes = [];
+      
+      createAnswerObjects(selectedNumAnswers, true);
+      generateQuestion();
+      countdownStarted = false;
+      gameReady = true;
+      createScoreDisplay();
+      
+      const timerSound = document.getElementById('timerSound');
+      timerSound.currentTime = 0;
+      timerSound.loop = false;
+      timerSound.play().catch(e => console.error(e));
+    }
+    
+    // ============================================================================
+    // Leaderboard final en AR: mensaje, tabla y botones de scroll
+    // ============================================================================
+    async function endGame() {
+      gameOver = true;
+      if (questionMesh) scene.remove(questionMesh);
+      if (countdownMesh) scene.remove(countdownMesh);
+      if (scoreMesh) scene.remove(scoreMesh);
+      answers.forEach(panel => scene.remove(panel));
+      
+      const gameOverCanvas = document.createElement('canvas');
+      gameOverCanvas.width = 256 * resolutionFactor;
+      gameOverCanvas.height = 128 * resolutionFactor;
+      const gameOverCtx = gameOverCanvas.getContext('2d');
+      gameOverCtx.fillStyle = "#007BFF";
+      drawRoundedRect(gameOverCtx, 0, 0, gameOverCanvas.width, gameOverCanvas.height, 10 * resolutionFactor);
+      gameOverCtx.fillStyle = "#FFFFFF";
+      gameOverCtx.font = 'Bold ' + (24 * resolutionFactor) + 'px Arial';
+      gameOverCtx.textAlign = "center";
+      gameOverCtx.textBaseline = "middle";
+      gameOverCtx.fillText("Fin del Juego", gameOverCanvas.width / 2, 30 * resolutionFactor);
+      gameOverCtx.font = 'Bold ' + (18 * resolutionFactor) + 'px Arial';
+      gameOverCtx.fillText(`Aciertos: ${correctCount}`, gameOverCanvas.width / 2, 65 * resolutionFactor);
+      gameOverCtx.fillText(`Fallos: ${wrongCount}`, gameOverCanvas.width / 2, 100 * resolutionFactor);
+      const gameOverTexture = new THREE.CanvasTexture(gameOverCanvas);
+      gameOverTexture.minFilter = THREE.LinearFilter;
+      gameOverTexture.magFilter = THREE.LinearFilter;
+      const geometry = new THREE.PlaneGeometry(0.5, 0.25);
+      const material = new THREE.MeshBasicMaterial({ map: gameOverTexture, transparent: true });
+      finalMessageMesh = new THREE.Mesh(geometry, material);
+      finalMessageMesh.position.set(0, 0, -0.8);
+      scene.add(finalMessageMesh);
+      
+      let avgTime = 0;
+      if (correctResponseTimes.length > 0) {
+        let sum = correctResponseTimes.reduce((a, b) => a + b, 0);
+        avgTime = sum / correctResponseTimes.length / 1000;
+      }
+      const rawScore = (correctCount - wrongCount) - avgTime;
+      const finalScore = parseFloat(rawScore.toFixed(3));
+      const collectionName = `Calcleaderboard_${selectedNumAnswers}`;
+      
+      let docsFound = await getDocs(
+        query(
+          collection(db, collectionName),
+          where("name", "==", playerName),
+          limit(1)
+        )
+      );
+      if (!docsFound.empty) {
+        const docToUpdate = docsFound.docs[0];
+        await updateDoc(doc(db, collectionName, docToUpdate.id), {
+          score: finalScore,
+          timestamp: serverTimestamp()
+        });
+      } else {
+        await addDoc(collection(db, collectionName), {
+          name: playerName,
+          score: finalScore,
+          timestamp: serverTimestamp()
+        });
+      }
+      
+      let qLeaderboard = query(
+        collection(db, collectionName),
+        orderBy("score", "desc")
+      );
+      let querySnapshot;
+      try {
+        querySnapshot = await getDocs(qLeaderboard);
+      } catch (err) {
+        console.error("Error consultando el leaderboard:", err);
+        return;
+      }
+      leaderboardResults = [];
+      let idx = 0;
+      querySnapshot.forEach((docSnap) => {
+        let data = docSnap.data();
+        leaderboardResults.push({ ...data, _index: idx });
+        idx++;
+      });
+      let playerIndex = leaderboardResults.findIndex(
+        (r) => r.name === playerName && r.score === finalScore
+      );
+      playerPosition = (playerIndex >= 0) ? (playerIndex + 1) : null;
+      scoreboardStartIndex = playerIndex - Math.floor(pageSize / 2);
+      if (scoreboardStartIndex < 0) scoreboardStartIndex = 0;
+      if (scoreboardStartIndex >= leaderboardResults.length) {
+        scoreboardStartIndex = 0;
+      }
+      createLeaderboardMesh();
+      drawLeaderboardSegment();
+    }
+    
+    function createLeaderboardMesh() {
+      if (leaderboardMesh) { scene.remove(leaderboardMesh); leaderboardMesh = null; }
+      if (restartButtonMesh) { scene.remove(restartButtonMesh); restartButtonMesh = null; }
+      if (scrollUpButtonMesh) { scene.remove(scrollUpButtonMesh); scrollUpButtonMesh = null; }
+      if (scrollDownButtonMesh) { scene.remove(scrollDownButtonMesh); scrollDownButtonMesh = null; }
+      
+      const dummyCanvas = document.createElement('canvas');
+      dummyCanvas.width = 512;
+      dummyCanvas.height = 512;
+      const ctx = dummyCanvas.getContext('2d');
+      const lbTexture = new THREE.CanvasTexture(dummyCanvas);
+      lbTexture.minFilter = THREE.LinearFilter;
+      lbTexture.magFilter = THREE.LinearFilter;
+      const planeWidth = 1.2;
+      const planeHeight = 1.0;
+      const lbGeometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
+      const lbMaterial = new THREE.MeshBasicMaterial({ map: lbTexture, transparent: true });
+      leaderboardMesh = new THREE.Mesh(lbGeometry, lbMaterial);
+      leaderboardMesh.userData = { canvas: dummyCanvas, ctx, texture: lbTexture, planeWidth, planeHeight };
+      leaderboardMesh.position.set(0, 0, -1.2);
+      scene.add(leaderboardMesh);
+      
+      restartButtonMesh = createButton("Reiniciar");
+      restartButtonMesh.position.set(0, -0.8, -1.1);
+      scene.add(restartButtonMesh);
+      
       scrollUpButtonMesh = createButton("▲", 0.1, 0.1);
       scrollUpButtonMesh.position.set(-planeWidth * 0.5 - 0.1, planeHeight * 0.35, -1.1);
       scene.add(scrollUpButtonMesh);
