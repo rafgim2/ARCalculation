@@ -14,7 +14,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background-color: #aaf951; /* Verde claro */
+      background-color: #aaf951;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
@@ -146,14 +146,13 @@
     
     /***** 2) AR y lógica del juego (CALCULATION) *****/
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.138.0/build/three.module.js';
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    const requiredFeatures = isMobile ? ['hit-test'] : ['hit-test', 'hand-tracking'];
+    // Se importa ARButton desde three.js
     import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.138.0/examples/jsm/webxr/ARButton.js';
     
-    // Declaración de variables globales
+    // Variables globales
     let camera, scene, renderer;
     let correctAnswer;
-    let answers = []; // Paneles de respuesta
+    let answers = [];
     let hasCollided = false;
     let questionMesh = null;
     let questionText = "";
@@ -165,11 +164,9 @@
     const gameDuration = 60; // segundos
     let gameOver = false;
     
-    // Mallas de AR para countdown y score
     let countdownMesh = null, countdownCanvas = null, countdownCtx = null, countdownTexture = null;
     let scoreMesh = null, scoreCanvas = null, scoreCtx = null, scoreTexture = null;
     
-    // Mallas para la tabla final (leaderboard) en AR
     let finalMessageMesh = null;
     let restartButtonMesh = null, scrollUpButtonMesh = null, scrollDownButtonMesh = null;
     let leaderboardMesh = null;
@@ -178,7 +175,6 @@
     const pageSize = 10;
     let playerPosition = null;
     
-    // Número de respuestas y control de posiciones originales
     let selectedNumAnswers = 4;
     let originalAnswerTransforms = null;
     let beepPlayed = false;
@@ -186,13 +182,9 @@
     let countdownStarted = false;
     const resolutionFactor = 4;
     
-    // Medición de tiempos de respuesta
     let currentQuestionStartTime = 0;
     let correctResponseTimes = [];
     
-    // ============================================================================
-    // Función para dibujar un rectángulo redondeado (sin sombras)
-    // ============================================================================
     function drawRoundedRect(ctx, x, y, width, height, radius) {
       ctx.beginPath();
       ctx.moveTo(x + radius, y);
@@ -208,9 +200,6 @@
       ctx.fill();
     }
     
-    // ============================================================================
-    // Función para actualizar el panel de respuesta
-    // ============================================================================
     function updateAnswerPanel(mesh, value) {
       const canvas = document.createElement('canvas');
       canvas.width = 256 * resolutionFactor;
@@ -232,9 +221,6 @@
       mesh.userData.answer = value;
     }
     
-    // ============================================================================
-    // Función para actualizar el panel de pregunta (ajustando fuente)
-    // ============================================================================
     function updateQuestionPanel() {
       const canvas = document.createElement('canvas');
       canvas.width = 512 * resolutionFactor;
@@ -264,15 +250,11 @@
         const geometry = new THREE.PlaneGeometry(0.6, 0.15);
         const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
         questionMesh = new THREE.Mesh(geometry, material);
-        // Posición original de la pregunta en AR MULTIMUSIC
         questionMesh.position.set(0, 0.3, -0.8);
         scene.add(questionMesh);
       }
     }
     
-    // ============================================================================
-    // Función para crear (o actualizar) los paneles de respuesta (manteniendo posiciones originales)
-    // ============================================================================
     function createAnswerObjects(numAnswers, initialCreation) {
       const minArc = 1.39626;
       const maxArc = Math.PI;
@@ -295,7 +277,6 @@
           ctx.fillStyle = "#FFFFFF";
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          // Generamos opciones: usar el correcto y números aleatorios distintos
           const wrongAnswers = new Set();
           while(wrongAnswers.size < (numAnswers-1)) {
             let wrong = Math.floor(Math.random()*100)+1;
@@ -345,9 +326,6 @@
       createAnswerObjects(selectedNumAnswers, false);
     }
     
-    // ============================================================================
-    // Función para crear efecto de chispas
-    // ============================================================================
     function createCircleTexture() {
       const size = 128;
       const canvas = document.createElement('canvas');
@@ -405,9 +383,6 @@
       });
     }
     
-    // ============================================================================
-    // Función para generar la pregunta: expresión combinada
-    // ============================================================================
     function generateQuestion() {
       const ops = ["+", "-", "*"];
       let a, b, c, op1, op2, calcExpression, displayExpression, structure;
@@ -457,13 +432,32 @@
       currentQuestionStartTime = performance.now();
     }
     
-    // ============================================================================
-    // Inicialización de la escena, cámara, renderer y overlay
-    // ============================================================================
     let initialCameraPos = new THREE.Vector3();
     let initialCameraDir = new THREE.Vector3();
     
-    function init() {
+    // Función asíncrona para determinar los requiredFeatures
+    async function getRequiredFeatures() {
+      const features = ['hit-test'];
+      if (navigator.xr) {
+        try {
+          const handTrackingSupported = await navigator.xr.isSessionSupported('immersive-ar', {
+            requiredFeatures: ['hand-tracking']
+          });
+          if (handTrackingSupported) {
+            features.push('hand-tracking');
+            console.log("Dispositivo soporta hand-tracking");
+          } else {
+            console.log("Dispositivo no soporta hand-tracking");
+          }
+        } catch (err) {
+          console.warn("No se pudo comprobar el soporte de hand-tracking:", err);
+        }
+      }
+      return features;
+    }
+    
+    // Inicialización de la escena, cámara, renderer y overlay
+    async function init() {
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -478,7 +472,6 @@
       
       window.addEventListener('resize', onWindowResize, false);
       
-      // Overlay inicial con imagen, link, selector de respuestas, mini tabla (top 3) y input para nombre
       const overlay = document.createElement('div');
       overlay.id = 'overlay';
       overlay.innerHTML =
@@ -499,7 +492,9 @@
         '<div id="leaderboardPreview"></div>' +
         '<input type="text" id="playerName" placeholder="Ingresa tu nombre" style="padding:10px; font-size:16px; margin-bottom:20px;" maxlength="10">';
       
-      // Se crea el ARButton y se añade al overlay (no se elimina para que funcione el clic)
+      // Obtenemos las features de forma asíncrona
+      const requiredFeatures = await getRequiredFeatures();
+      
       const arButton = ARButton.createButton(renderer, { requiredFeatures });
       arButton.style.position = 'absolute';
       arButton.style.top = '450px';
@@ -513,7 +508,6 @@
       overlay.appendChild(arButton);
       document.body.appendChild(overlay);
       
-      // Actualizar la mini tabla cada vez que cambie el número de respuestas
       document.getElementById('numAnswers').addEventListener('change', () => {
         const num = parseInt(document.getElementById('numAnswers').value) || 4;
         updateLeaderboardPreview(num);
@@ -521,20 +515,16 @@
       updateLeaderboardPreview(4);
       
       renderer.xr.addEventListener('sessionstart', () => {
-        // Guardar posición y dirección inicial de la cámara
         camera.getWorldPosition(initialCameraPos);
         camera.getWorldDirection(initialCameraDir);
         initialCameraDir.normalize();
         selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
-        const inputName = document.getElementById('playerName').value;
-        playerName = (inputName !== "") ? inputName : "Jugador";
+        playerName = (document.getElementById('playerName').value !== "") ? document.getElementById('playerName').value : "Jugador";
         createAnswerObjects(selectedNumAnswers, true);
-        // Se remueve el overlay para liberar pantalla AR
         overlay.remove();
         generateQuestion();
         createScoreDisplay();
         gameReady = true;
-        // Iniciamos el cronómetro de juego
         gameStartTime = performance.now();
       });
     }
@@ -545,9 +535,6 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     }
     
-    // ============================================================================
-    // Display de countdown y score (posiciones originales en AR MULTIMUSIC)
-    // ============================================================================
     function startCountdown() {
       gameStartTime = performance.now();
       countdownCanvas = document.createElement('canvas');
@@ -560,7 +547,6 @@
       const geometry = new THREE.PlaneGeometry(0.6, 0.3);
       const material = new THREE.MeshBasicMaterial({ map: countdownTexture, transparent: true });
       countdownMesh = new THREE.Mesh(geometry, material);
-      // Posición original del countdown
       countdownMesh.position.set(0, 0.50, -0.82);
       scene.add(countdownMesh);
     }
@@ -576,7 +562,6 @@
       const geometry = new THREE.PlaneGeometry(0.6, 0.3);
       const material = new THREE.MeshBasicMaterial({ map: scoreTexture, transparent: true });
       scoreMesh = new THREE.Mesh(geometry, material);
-      // Posición original del score
       scoreMesh.position.set(0, -0.2, -0.82);
       scene.add(scoreMesh);
     }
@@ -611,9 +596,6 @@
       scoreTexture.needsUpdate = true;
     }
     
-    // ============================================================================
-    // Render loop con detección de colisiones y efectos
-    // ============================================================================
     function animate() {
       renderer.setAnimationLoop(render);
     }
@@ -668,7 +650,6 @@
         }
       }
       
-      // Detección de colisiones (XR: manos o cámara)
       const session = renderer.xr.getSession();
       let interactionPoints = [];
       if(session && xrFrame){
@@ -736,7 +717,6 @@
           }
         }
       } else {
-        // En juego final, detección para botón de reinicio o scroll
         if(restartButtonMesh){
           const btnPos = new THREE.Vector3();
           restartButtonMesh.getWorldPosition(btnPos);
@@ -760,9 +740,6 @@
       }
     }
     
-    // ============================================================================
-    // Función para subir puntaje y mostrar la tabla final (leaderboard) en AR
-    // ============================================================================
     async function endGame() {
       gameOver = true;
       if(questionMesh) scene.remove(questionMesh);
@@ -800,7 +777,6 @@
         });
       }
       
-      // Consultar leaderboard completo para mostrar en AR
       let qLeaderboard = query(
         collection(db, collectionName),
         orderBy("score", "desc")
@@ -828,9 +804,6 @@
       drawLeaderboardSegment();
     }
     
-    // ============================================================================
-    // Funciones para crear la malla del leaderboard final en AR (con botones de scroll)
-    // ============================================================================
     function createLeaderboardMesh() {
       if(leaderboardMesh){ scene.remove(leaderboardMesh); leaderboardMesh = null; }
       if(restartButtonMesh){ scene.remove(restartButtonMesh); restartButtonMesh = null; }
@@ -853,12 +826,10 @@
       leaderboardMesh.position.set(0, 0, -1.2);
       scene.add(leaderboardMesh);
       
-      // Botón de reinicio en AR
       restartButtonMesh = createButton("Reiniciar");
       restartButtonMesh.position.set(0, -0.8, -1.1);
       scene.add(restartButtonMesh);
       
-      // Botones de scroll
       scrollUpButtonMesh = createButton("▲", 0.1, 0.1);
       scrollUpButtonMesh.position.set(-planeWidth * 0.5 - 0.1, planeHeight * 0.35, -1.1);
       scene.add(scrollUpButtonMesh);
@@ -924,9 +895,6 @@
       scrollDownButtonMesh.position.set(-planeWidth*0.5 - 0.1, -planeHeight*0.35, -1.1);
     }
     
-    // ============================================================================
-    // Función para crear un botón en AR
-    // ============================================================================
     function createButton(text, planeWidth = 0.3, planeHeight = 0.1) {
       const canvas = document.createElement('canvas');
       canvas.width = 128 * resolutionFactor;
@@ -947,9 +915,6 @@
       return new THREE.Mesh(geom, mat);
     }
     
-    // ============================================================================
-    // Eventos táctiles: desbloquear audio y raycasting
-    // ============================================================================
     window.addEventListener('touchstart', function unlockAudio() {
       const successEl = document.getElementById('successSound');
       const errorEl = document.getElementById('errorSound');
@@ -1040,9 +1005,6 @@
       }
     }, false);
     
-    // ============================================================================
-    // Función para reiniciar el juego (incluye borrar leaderboard y botones)
-    // ============================================================================
     function restartGame() {
       if(finalMessageMesh) { scene.remove(finalMessageMesh); finalMessageMesh = null; }
       if(restartButtonMesh) { scene.remove(restartButtonMesh); restartButtonMesh = null; }
@@ -1067,9 +1029,6 @@
       timerSound.play().catch(e=>console.error(e));
     }
     
-    // ============================================================================
-    // Inicializar AR y lanzar animación
-    // ============================================================================
     init();
     animate();
   </script>
