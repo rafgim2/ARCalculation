@@ -8,8 +8,7 @@
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
     /* Overlay del menú inicial */
     #overlay {
-      position: absolute;
-      padding-top: 100px;
+      position: fixed;
       top: 0;
       left: 0;
       width: 100%;
@@ -21,7 +20,7 @@
       align-items: center;
       color: #fff;
       text-align: center;
-      z-index: 10;
+      z-index: 1000;
       box-sizing: border-box;
       padding: 20px;
     }
@@ -289,8 +288,8 @@
     // ============================================================================
     function createAnswerObjects(numAnswers, initialCreation) {
       // Interpolamos entre un half-angle de 40° (0.698 rad) y 90° (Math.PI/2)
-      const minHalfArc = 0.698132; // 40°
-      const maxHalfArc = Math.PI / 2; // 90°
+      const minHalfArc = 0.698132;
+      const maxHalfArc = Math.PI / 2;
       let halfArc = (numAnswers <= 4) ? minHalfArc 
                     : (numAnswers >= 10) ? maxHalfArc 
                     : minHalfArc + ((numAnswers - 4) / (10 - 4)) * (maxHalfArc - minHalfArc);
@@ -531,7 +530,7 @@
       window.overlay = document.createElement('div');
       overlay.id = 'overlay';
       overlay.innerHTML =
-        '<img src="ARCalc.jpeg" alt="ARCalculation" style="margin-bottom:20px;margin-top:50px;">' +
+        '<img src="ARCalc.jpeg" alt="ARCalculation" style="margin-bottom:20px;">' +
         '<a href="https://www.youtube.com/@rafgim" target="_blank">© By Rafael Gimeno</a>' +
         '<div class="respuestas-container">' +
           '<label for="numAnswers">Respuestas:</label>' +
@@ -552,7 +551,7 @@
         // Agregar botón AR
         const arButton = ARButton.createButton(renderer, { requiredFeatures });
         arButton.style.position = 'absolute';
-        arButton.style.top = '600px';
+        arButton.style.top = '450px';
         arButton.style.left = 'calc(50% - 75px)';
         arButton.style.width = '150px';
         arButton.style.height = '50px';
@@ -715,7 +714,7 @@
         }
       }
       
-      // Detección de colisiones: si XR está disponible se usa, sino se usa la posición de la cámara
+      // Detección de colisiones: se usa XR si está disponible, sino se utiliza la posición de la cámara
       const session = renderer.xr.getSession();
       let interactionPoints = [];
       if(session && xrFrame){
