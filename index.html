@@ -2,483 +2,246 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>AR MULTIMUSIC - Modo 2D</title>
+  <title>MultiMusic - Juego 2D</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <style>
-    body { margin: 0; overflow: hidden; font-family: sans-serif; }
-    /* Overlay inicial para configuración */
+    body { margin: 0; font-family: sans-serif; background: #222; color: #fff; }
+    /* Overlay inicial de configuración */
     #overlay {
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
-      background-color: #aaf951;
+      background: #aaf951;
       display: flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
+      justify-content: center;
       z-index: 1000;
       padding: 20px;
       box-sizing: border-box;
     }
-    #overlay img { border-radius: 20px; max-width: 70%; }
-    #overlay input, #overlay select { padding: 10px; font-size: 16px; margin: 10px 0; }
-    #startButton {
-      padding: 10px 20px;
+    #overlay img { 
+      max-width: 80%; 
+      margin-bottom: 20px;
+      border-radius: 10px;
+    }
+    #overlay input, #overlay select, #overlay button {
       font-size: 18px;
-      background-color: green;
-      color: white;
+      padding: 10px;
+      margin: 10px 0;
       border: none;
-      border-radius: 8px;
+      border-radius: 5px;
+    }
+    #overlay button {
+      background: green;
+      color: #fff;
       cursor: pointer;
+    }
+    /* Contenedor del juego (inicialmente oculto) */
+    #gameContainer {
+      display: none;
+      width: 100%;
+      height: 100vh;
+      position: relative;
+      text-align: center;
+      padding-top: 20px;
+      box-sizing: border-box;
+    }
+    #questionContainer {
+      font-size: 2em;
+      margin-bottom: 20px;
+    }
+    #answersContainer {
+      margin-bottom: 20px;
+    }
+    #answersContainer button {
+      font-size: 1.5em;
+      margin: 10px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      background: #007BFF;
+      color: #fff;
+      cursor: pointer;
+    }
+    #infoContainer {
+      font-size: 1.2em;
+      display: flex;
+      justify-content: space-around;
       margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <!-- Audios -->
-  <audio id="successSound" src="https://raw.githubusercontent.com/rafgim2/ARCalculation/main/acierto.wav" preload="auto"></audio>
-  <audio id="errorSound" src="https://raw.githubusercontent.com/rafgim2/ARCalculation/main/error.wav" preload="auto"></audio>
-  <audio id="timerSound" src="https://raw.githubusercontent.com/rafgim2/ARCalculation/main/timer7.mp3" preload="auto"></audio>
-  <audio id="beepSound" src="https://raw.githubusercontent.com/rafgim2/ARMultimusic/main/beep.wav" preload="auto"></audio>
-  
-  <script type="module">
-    // --- Importaciones y Firebase (no se usa AR en esta versión) ---
-    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.138.0/build/three.module.js";
-    // Aquí se incluirían firebase y firestore si se desea subir puntajes.
-    // Para simplificar, omitiremos Firebase en este ejemplo.
+  <!-- Overlay de configuración -->
+  <div id="overlay">
+    <img src="ARCalc.jpeg" alt="MultiMusic">
+    <input type="text" id="playerName" placeholder="Ingresa tu nombre">
+    <div>
+      <label for="numAnswers">Número de respuestas: </label>
+      <select id="numAnswers">
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+        <option value="9">9</option>
+        <option value="10">10</option>
+      </select>
+    </div>
+    <button id="startButton">Iniciar Juego</button>
+  </div>
 
-    // --- Variables globales ---
-    let scene, camera, renderer;
-    let questionMesh = null;
-    let questionText = "";
+  <!-- Contenedor del juego -->
+  <div id="gameContainer">
+    <div id="questionContainer">Pregunta aparecerá aquí</div>
+    <div id="answersContainer"></div>
+    <div id="infoContainer">
+      <div id="countdownTimer">00:60</div>
+      <div id="scoreDisplay">Aciertos: 0 | Fallos: 0</div>
+    </div>
+  </div>
+
+  <script>
+    // Variables globales del juego
+    let playerName = "Jugador";
+    let selectedNumAnswers = 4;
     let correctAnswer;
-    let answers = []; // Array de mallas de respuestas
     let correctCount = 0, wrongCount = 0;
     let gameStartTime = 0;
     const gameDuration = 60; // segundos
-    let gameOver = false;
-    let countdownMesh = null, countdownCanvas = null, countdownCtx = null, countdownTexture = null;
-    let scoreMesh = null, scoreCanvas = null, scoreCtx = null, scoreTexture = null;
-    let selectedNumAnswers = 4;
-    let originalAnswerTransforms = [];
+    let countdownInterval;
     let currentQuestionStartTime = 0;
     let correctResponseTimes = [];
-    let beepPlayed = false;
-    
-    // Forzamos modo 2D (no AR)
-    const mode2D = true;
-    
-    // --- Configuración de la escena y cámara ortográfica ---
-    function initScene() {
-      scene = new THREE.Scene();
-      // Para modo 2D, usamos un fondo visible
-      scene.background = new THREE.Color(0x222222);
-      const aspect = window.innerWidth / window.innerHeight;
-      const d = 3; // Tamaño de la mitad del frustum vertical
-      // Importante: los parámetros near y far se ponen a -1000 y 1000 para ver objetos delante de la cámara.
-      camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, -1000, 1000);
-      // Colocamos la cámara en (0,0,10) y la hacemos mirar al origen
-      camera.position.set(0, 0, 10);
-      camera.lookAt(0, 0, 0);
-    }
-    
-    // --- Configuración del renderer ---
-    function initRenderer() {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      // Forzamos el canvas detrás
-      renderer.domElement.style.position = "absolute";
-      renderer.domElement.style.top = "0";
-      renderer.domElement.style.left = "0";
-      renderer.domElement.style.zIndex = "0";
-      document.body.appendChild(renderer.domElement);
-    }
-    
-    // --- Función para dibujar un rectángulo redondeado ---
-    function drawRoundedRect(ctx, x, y, width, height, radius) {
-      ctx.beginPath();
-      ctx.moveTo(x + radius, y);
-      ctx.lineTo(x + width - radius, y);
-      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-      ctx.lineTo(x + width, y + height - radius);
-      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-      ctx.lineTo(x + radius, y + height);
-      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-      ctx.lineTo(x, y + radius);
-      ctx.quadraticCurveTo(x, y, x + radius, y);
-      ctx.closePath();
-      ctx.fill();
-    }
-    
-    // --- Panel de Pregunta ---
-    function updateQuestionPanel() {
-      const canvas = document.createElement("canvas");
-      canvas.width = 512 * 4;
-      canvas.height = 128 * 4;
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#007BFF";
-      drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * 4);
-      let fontSize = 48 * 4;
-      ctx.font = "Bold " + fontSize + "px Arial";
-      const maxWidth = canvas.width * 0.9;
-      while (ctx.measureText(questionText).width > maxWidth && fontSize > 12 * 4) {
-        fontSize -= 2 * 4;
-        ctx.font = "Bold " + fontSize + "px Arial";
-      }
-      ctx.fillStyle = "#FFFFFF";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(questionText, canvas.width / 2, canvas.height / 2);
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      if (questionMesh) {
-        questionMesh.material.map = texture;
-        questionMesh.material.needsUpdate = true;
-      } else {
-        // Para modo 2D, hacemos la malla grande y la colocamos en la parte superior
-        const geometry = new THREE.PlaneGeometry(2, 0.5);
-        const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
-        questionMesh = new THREE.Mesh(geometry, material);
-        questionMesh.position.set(0, 2.5, 0.1);
-        scene.add(questionMesh);
-      }
-    }
-    
-    // --- Paneles de Respuestas ---
-    function createAnswerObjects(numAnswers, initialCreation) {
-      const baseRadius = 3; // Para distribuir las respuestas en 2D
-      // Interpolar entre 40° y 90°
-      const minHalfArc = 0.698132;
-      const maxHalfArc = Math.PI / 2;
-      let halfArc = (numAnswers <= 4) ? minHalfArc :
-                    (numAnswers >= 10) ? maxHalfArc :
-                    minHalfArc + ((numAnswers - 4) / (10 - 4)) * (maxHalfArc - minHalfArc);
-      const angleStart = -halfArc;
-      const angleEnd = halfArc;
-      
-      if (initialCreation) {
-        originalAnswerTransforms = [];
-        for (let i = 0; i < numAnswers; i++) {
-          const canvas = document.createElement("canvas");
-          canvas.width = 256 * 4;
-          canvas.height = 256 * 4;
-          const ctx = canvas.getContext("2d");
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.fillStyle = "#007BFF";
-          drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * 4);
-          ctx.font = "Bold " + (75 * 4) + "px Arial";
-          ctx.fillStyle = "#FFFFFF";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          // Generar respuesta correcta y varias incorrectas
-          const wrongAnswers = new Set();
-          while(wrongAnswers.size < (numAnswers - 1)) {
-            let wrong = Math.floor(Math.random() * 100) + 1;
-            if(wrong !== correctAnswer) wrongAnswers.add(wrong);
-          }
-          const answersArray = [correctAnswer, ...wrongAnswers];
-          answersArray.sort(() => Math.random() - 0.5);
-          ctx.fillText(answersArray[i], canvas.width/2, canvas.height/2);
-          const texture = new THREE.CanvasTexture(canvas);
-          texture.minFilter = THREE.LinearFilter;
-          texture.magFilter = THREE.LinearFilter;
-          const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
-          const geometry = new THREE.PlaneGeometry(0.8, 0.8);
-          const mesh = new THREE.Mesh(geometry, material);
-          const angle = angleStart + (angleEnd - angleStart) * (i / (numAnswers - 1));
-          const xOffset = baseRadius * Math.sin(angle);
-          // Colocamos las respuestas en la parte inferior
-          mesh.position.set(xOffset, -1, 0);
-          mesh.userData.answer = answersArray[i];
-          answers.push(mesh);
-          scene.add(mesh);
-          originalAnswerTransforms.push({ position: mesh.position.clone(), rotation: mesh.rotation.clone() });
-        }
-      } else {
-        // Actualiza las texturas de las respuestas ya creadas
-        const numAnswersExisting = selectedNumAnswers;
-        const wrongAnswers = new Set();
-        while(wrongAnswers.size < (numAnswersExisting - 1)) {
-          let wrong = Math.floor(Math.random() * 100) + 1;
-          if(wrong !== correctAnswer) wrongAnswers.add(wrong);
-        }
-        const answersArray = [correctAnswer, ...wrongAnswers];
-        answersArray.sort(() => Math.random() - 0.5);
-        for(let i = 0; i < numAnswersExisting; i++){
-          updateAnswerPanel(answers[i], answersArray[i]);
-        }
-      }
-    }
-    
-    function updateAnswerObjects() {
-      createAnswerObjects(selectedNumAnswers, false);
-    }
-    
-    // --- Efecto de chispas ---
-    function createCircleTexture() {
-      const size = 128;
-      const canvas = document.createElement("canvas");
-      canvas.width = size; canvas.height = size;
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, size, size);
-      const gradient = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
-      gradient.addColorStop(0, "rgba(255,255,255,1)");
-      gradient.addColorStop(1, "rgba(255,255,255,0)");
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, size, size);
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      return texture;
-    }
-    
-    const sparkTexture = createCircleTexture();
-    
-    function createSparksEffect(position) {
-      const count = 100;
-      const positions = new Float32Array(count * 3);
-      const velocities = [];
-      for(let i = 0; i < count; i++){
-        positions[i*3] = position.x;
-        positions[i*3+1] = position.y;
-        positions[i*3+2] = position.z;
-        velocities.push(new THREE.Vector3(
-          (Math.random()-0.5)*0.5,
-          (Math.random()-0.5)*0.5,
-          (Math.random()-0.5)*0.5
-        ));
-      }
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-      const material = new THREE.PointsMaterial({
-        color: 0xffffff,
-        size: 0.05,
-        map: sparkTexture,
-        transparent: true,
-        opacity: 1.0,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        alphaTest: 0.5,
-        sizeAttenuation: false
-      });
-      const points = new THREE.Points(geometry, material);
-      scene.add(points);
-    }
-    
-    // --- Genera la pregunta ---
+
+    // Referencias a contenedores HTML
+    const overlay = document.getElementById("overlay");
+    const startButton = document.getElementById("startButton");
+    const gameContainer = document.getElementById("gameContainer");
+    const questionContainer = document.getElementById("questionContainer");
+    const answersContainer = document.getElementById("answersContainer");
+    const countdownTimer = document.getElementById("countdownTimer");
+    const scoreDisplay = document.getElementById("scoreDisplay");
+
+    // Genera una pregunta aritmética aleatoria
     function generateQuestion() {
       const ops = ["+", "-", "*"];
-      let a, b, c, op1, op2, calcExpression, displayExpression, structure;
+      let a, b, c, op1, op2, expr, structure;
       while(true) {
-        a = Math.floor(Math.random()*10)+1;
-        b = Math.floor(Math.random()*10)+1;
-        c = Math.floor(Math.random()*10)+1;
-        op1 = ops[Math.floor(Math.random()*ops.length)];
-        op2 = ops[Math.floor(Math.random()*ops.length)];
+        a = Math.floor(Math.random() * 10) + 1;
+        b = Math.floor(Math.random() * 10) + 1;
+        c = Math.floor(Math.random() * 10) + 1;
+        op1 = ops[Math.floor(Math.random() * ops.length)];
+        op2 = ops[Math.floor(Math.random() * ops.length)];
         structure = Math.random() < 0.5 ? 0 : 1;
         if(structure === 0) {
-          if(op1 === "-" && a < b){ [a,b] = [b,a]; }
+          if(op1 === "-" && a < b) { [a, b] = [b, a]; }
           let part1 = eval(`${a} ${op1} ${b}`);
           if(op2 === "-" && part1 < c) {
-            if(part1 > 0) { c = Math.floor(Math.random()*part1)+1; }
+            if(part1 > 0) { c = Math.floor(Math.random() * part1) + 1; }
             else continue;
           }
-          calcExpression = `(${a} ${op1} ${b}) ${op2} ${c}`;
-          if(eval(calcExpression) >= 0) break;
+          expr = `(${a} ${op1} ${b}) ${op2} ${c}`;
         } else {
-          if(op2 === "-" && b < c){ [b,c] = [c,b]; }
+          if(op2 === "-" && b < c) { [b, c] = [c, b]; }
           let part2 = eval(`${b} ${op2} ${c}`);
-          if(op1 === "-" && a < part2){ a = Math.floor(Math.random()*10)+part2; }
-          calcExpression = `${a} ${op1} (${b} ${op2} ${c})`;
-          if(eval(calcExpression) >= 0) break;
+          if(op1 === "-" && a < part2) { a = Math.floor(Math.random() * 10) + part2; }
+          expr = `${a} ${op1} (${b} ${op2} ${c})`;
+        }
+        // Evitamos respuestas negativas
+        if(eval(expr) >= 0) break;
+      }
+      correctAnswer = eval(expr);
+      return expr;
+    }
+
+    // Genera un arreglo de opciones (la correcta y varias incorrectas)
+    function generateOptions() {
+      let options = [];
+      options.push(correctAnswer);
+      while(options.length < selectedNumAnswers) {
+        let wrong = Math.floor(Math.random() * 100) + 1;
+        if(wrong !== correctAnswer && !options.includes(wrong)) {
+          options.push(wrong);
         }
       }
-      correctAnswer = eval(calcExpression);
-      const displayOp1 = op1 === "*" ? "x" : op1;
-      const displayOp2 = op2 === "*" ? "x" : op2;
-      if(structure === 0) {
-        displayExpression = `(${a} ${displayOp1} ${b}) ${displayOp2} ${c}`;
-      } else {
-        displayExpression = `${a} ${displayOp1} (${b} ${displayOp2} ${c})`;
-      }
-      questionText = `¿Cuánto es ${displayExpression}?`;
-      if(questionMesh) { scene.remove(questionMesh); questionMesh = null; }
-      updateQuestionPanel();
-      if(answers.length === 0) { createAnswerObjects(selectedNumAnswers, true); }
-      else { updateAnswerObjects(); }
-      beepPlayed = false;
+      // Mezclar opciones
+      options.sort(() => Math.random() - 0.5);
+      return options;
+    }
+
+    // Muestra la pregunta y las respuestas en la pantalla
+    function displayQuestion() {
+      const expr = generateQuestion();
+      questionContainer.textContent = "¿Cuánto es " + expr + "?";
       currentQuestionStartTime = performance.now();
+
+      // Genera las opciones y crea botones
+      const options = generateOptions();
+      answersContainer.innerHTML = "";
+      options.forEach(option => {
+        const btn = document.createElement("button");
+        btn.textContent = option;
+        btn.addEventListener("click", () => answerClicked(option));
+        answersContainer.appendChild(btn);
+      });
     }
-    
-    // --- Inicia el juego (se invoca al pulsar "Iniciar Juego") ---
-    function startGame() {
-      selectedNumAnswers = parseInt(document.getElementById("numAnswers").value) || 4;
-      const inputName = document.getElementById("playerName").value;
-      playerName = inputName !== "" ? inputName : "Jugador";
-      const overlay = document.getElementById("overlay");
-      if(overlay) overlay.remove();
-      generateQuestion();
-      createScoreDisplay();
-      gameReady = true;
-      gameStartTime = performance.now();
-    }
-    
-    // --- Inicialización y render ---
-    function init() {
-      initScene();
-      initRenderer();
-      
-      // Agregamos una luz simple (aunque para MeshBasicMaterial no es necesaria)
-      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-      light.position.set(0, 1, 0);
-      scene.add(light);
-      
-      window.addEventListener("resize", onWindowResize, false);
-      
-      // Crear overlay inicial
-      const overlay = document.createElement("div");
-      overlay.id = "overlay";
-      overlay.innerHTML = `
-        <img src="ARCalc.jpeg" alt="ARCalculation">
-        <input type="text" id="playerName" placeholder="Ingresa tu nombre" maxlength="10">
-        <div class="respuestas-container">
-          <label for="numAnswers">Respuestas:</label>
-          <select id="numAnswers">
-            <option value="4">4</option>
-            <option value="5">5</option>
-            <option value="6">6</option>
-            <option value="7">7</option>
-            <option value="8">8</option>
-            <option value="9">9</option>
-            <option value="10">10</option>
-          </select>
-        </div>
-        <button id="startButton">Iniciar Juego</button>
-      `;
-      overlay.querySelector("#startButton").addEventListener("click", startGame);
-      document.body.appendChild(overlay);
-    }
-    
-    function onWindowResize() {
-      if(mode2D) {
-        const aspect = window.innerWidth / window.innerHeight;
-        const d = 3;
-        camera.left = -d * aspect;
-        camera.right = d * aspect;
-        camera.top = d;
-        camera.bottom = -d;
-        camera.updateProjectionMatrix();
+
+    // Maneja el clic en una respuesta
+    function answerClicked(selected) {
+      // Prevenir múltiples clics
+      if(selected == null) return;
+      if(selected === correctAnswer) {
+        correctCount++;
+        const responseTime = performance.now() - currentQuestionStartTime;
+        correctResponseTimes.push(responseTime);
       } else {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
+        wrongCount++;
       }
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      updateScore();
+      // Espera 1 segundo y genera una nueva pregunta
+      setTimeout(displayQuestion, 1000);
     }
-    
-    // --- Countdown y Score ---
+
+    // Actualiza la visualización del score
+    function updateScore() {
+      scoreDisplay.textContent = "Aciertos: " + correctCount + " | Fallos: " + wrongCount;
+    }
+
+    // Actualiza el cronómetro
     function startCountdown() {
       gameStartTime = performance.now();
-      countdownCanvas = document.createElement("canvas");
-      countdownCanvas.width = 256 * 4;
-      countdownCanvas.height = 128 * 4;
-      countdownCtx = countdownCanvas.getContext("2d");
-      countdownTexture = new THREE.CanvasTexture(countdownCanvas);
-      countdownTexture.minFilter = THREE.LinearFilter;
-      countdownTexture.magFilter = THREE.LinearFilter;
-      const geometry = new THREE.PlaneGeometry(2, 0.5);
-      const material = new THREE.MeshBasicMaterial({ map: countdownTexture, transparent: true });
-      countdownMesh = new THREE.Mesh(geometry, material);
-      countdownMesh.position.set(0, -2.2, 0);
-      scene.add(countdownMesh);
-    }
-    
-    function createScoreDisplay() {
-      scoreCanvas = document.createElement("canvas");
-      scoreCanvas.width = 256 * 4;
-      scoreCanvas.height = 128 * 4;
-      scoreCtx = scoreCanvas.getContext("2d");
-      scoreTexture = new THREE.CanvasTexture(scoreCanvas);
-      scoreTexture.minFilter = THREE.LinearFilter;
-      scoreTexture.magFilter = THREE.LinearFilter;
-      const geometry = new THREE.PlaneGeometry(2, 0.5);
-      const material = new THREE.MeshBasicMaterial({ map: scoreTexture, transparent: true });
-      scoreMesh = new THREE.Mesh(geometry, material);
-      scoreMesh.position.set(0, -2.7, 0);
-      scene.add(scoreMesh);
-    }
-    
-    function updateCountdown() {
-      const elapsed = (performance.now() - gameStartTime) / 1000;
-      const remaining = Math.max(0, gameDuration - elapsed);
-      const seconds = Math.floor(remaining);
-      countdownCtx.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height);
-      countdownCtx.fillStyle = remaining <= 10 ? "red" : "#FFFFFF";
-      countdownCtx.font = "Bold " + (64 * 4) + "px Arial";
-      countdownCtx.textAlign = "center";
-      countdownCtx.textBaseline = "middle";
-      countdownCtx.fillText(seconds < 10 ? "00:0" + seconds : "00:" + seconds, countdownCanvas.width/2, countdownCanvas.height/2);
-      countdownTexture.needsUpdate = true;
-      return remaining;
-    }
-    
-    function updateScoreDisplay() {
-      scoreCtx.clearRect(0, 0, scoreCanvas.width, scoreCanvas.height);
-      scoreCtx.fillStyle = "#FFFFFF";
-      scoreCtx.font = "Bold " + (24 * 4) + "px Arial";
-      scoreCtx.textAlign = "center";
-      scoreCtx.textBaseline = "middle";
-      scoreCtx.fillText(`Aciertos: ${correctCount} | Fallos: ${wrongCount}`, scoreCanvas.width/2, scoreCanvas.height/2);
-      scoreTexture.needsUpdate = true;
-    }
-    
-    // --- Render loop ---
-    function animate() {
-      renderer.setAnimationLoop(render);
-    }
-    
-    function render(timestamp, xrFrame) {
-      renderer.render(scene, camera);
-      answers.forEach((mesh, index) => {
-        if(originalAnswerTransforms[index]) {
-          const baseY = originalAnswerTransforms[index].position.y;
-          mesh.position.y = baseY + 0.02 * Math.sin(timestamp * 0.005 + index);
+      countdownInterval = setInterval(() => {
+        let elapsed = (performance.now() - gameStartTime) / 1000;
+        let remaining = Math.max(0, gameDuration - elapsed);
+        let seconds = Math.floor(remaining);
+        countdownTimer.textContent = "00:" + (seconds < 10 ? "0" + seconds : seconds);
+        if(remaining <= 0) {
+          clearInterval(countdownInterval);
+          endGame();
         }
-      });
-      if(gameReady && countdownMesh === null) {
-        startCountdown();
-      }
-      if(gameReady) {
-        const remaining = updateCountdown();
-        updateScoreDisplay();
-        if(remaining <= 0) { endGame(); }
-      }
-      // Para este ejemplo en 2D, usamos la posición de la cámara para raycasting
-      let cameraPos = new THREE.Vector3();
-      camera.getWorldPosition(cameraPos);
-      // Si se detecta una colisión (por simplicidad, no implemento raycasting completo aquí)
-      // Puedes simular que al hacer clic en cualquier parte se chequea una colisión.
+      }, 1000);
     }
-    
+
+    // Termina el juego y muestra el puntaje final
     function endGame() {
-      gameOver = true;
-      console.log("Juego terminado. Puntaje final:", correctCount - wrongCount);
-      // En este ejemplo solo se muestra el puntaje en consola
+      // Detiene el cronómetro y deshabilita las respuestas
+      clearInterval(countdownInterval);
+      answersContainer.innerHTML = "";
+      questionContainer.textContent = "Juego Terminado";
+      scoreDisplay.textContent = "Puntaje final: " + (correctCount - wrongCount);
     }
-    
-    // --- Eventos de audio desbloqueo ---
-    window.addEventListener("touchstart", function() {
-      const audios = [document.getElementById("successSound"), document.getElementById("errorSound")];
-      audios.forEach(audio => {
-        audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(e => {});
-      });
-    }, { once: true });
-    
-    // --- Iniciar ---
-    init();
-    animate();
+
+    // Inicia el juego: oculta el overlay y muestra el contenedor del juego
+    startButton.addEventListener("click", () => {
+      playerName = document.getElementById("playerName").value || "Jugador";
+      selectedNumAnswers = parseInt(document.getElementById("numAnswers").value) || 4;
+      overlay.style.display = "none";
+      gameContainer.style.display = "block";
+      updateScore();
+      displayQuestion();
+      startCountdown();
+    });
   </script>
 </body>
 </html>
