@@ -527,7 +527,7 @@
       window.overlay = document.createElement('div');
       overlay.id = 'overlay';
       overlay.innerHTML =
-        '<img src="ARCalc.jpeg" alt="ARCalculation" style="margin-bottom:20px;">' +
+        '<img src="ARCalc.jpeg" alt="ARCalculation" style="margin-bottom:20px;margin-top:50px;">' +
         '<a href="https://www.youtube.com/@rafgim" target="_blank">© By Rafael Gimeno</a>' +
         '<div class="respuestas-container">' +
           '<label for="numAnswers">Respuestas:</label>' +
@@ -548,7 +548,7 @@
       if(arSupported) {
         const arButton = ARButton.createButton(renderer, { requiredFeatures });
         arButton.style.position = 'absolute';
-        arButton.style.top = '450px';
+        arButton.style.top = '600px';
         arButton.style.left = 'calc(50% - 75px)';  /* Centrado, 150px de ancho */
         arButton.style.width = '150px';
         arButton.style.height = '50px';
