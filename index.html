@@ -252,9 +252,9 @@
         const geometry = new THREE.PlaneGeometry(0.6, 0.15);
         const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
         questionMesh = new THREE.Mesh(geometry, material);
-        // En modo 2D, posicionamos el panel de pregunta en la parte superior de la pantalla
+        // En 2D, ubicamos la pregunta en (0, 1.5, 0.1); en AR, en (0, 0.3, -0.8)
         if(mode2D) {
-          questionMesh.position.set(0, 1.5, 0);
+          questionMesh.position.set(0, 1.5, 0.1);
         } else {
           questionMesh.position.set(0, 0.3, -0.8);
         }
@@ -264,7 +264,6 @@
     
     // Crea o actualiza los paneles de respuesta
     function createAnswerObjects(numAnswers, initialCreation) {
-      // En modo 2D usamos un radio mayor para que los objetos sean más visibles
       const baseRadius = mode2D ? 2 : 0.8;
       // Interpolar entre un half-angle de 40° (0.698 rad) y 90° (Math.PI/2)
       const minHalfArc = 0.698132;
@@ -289,7 +288,6 @@
           ctx.fillStyle = "#FFFFFF";
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          // Generar opciones: el correcto y números aleatorios distintos
           const wrongAnswers = new Set();
           while(wrongAnswers.size < (numAnswers-1)) {
             let wrong = Math.floor(Math.random()*100)+1;
@@ -306,12 +304,11 @@
           const mesh = new THREE.Mesh(geometry, material);
           const angle = angleStart + (angleEnd - angleStart) * (i/(numAnswers-1));
           const xOffset = baseRadius * Math.sin(angle);
-          const yOffset = mode2D ? -0.5 : 0;  // En 2D, bajamos ligeramente las respuestas
-          const zOffset = mode2D ? 0 : -baseRadius * Math.cos(angle);
+          const yOffset = mode2D ? -0.5 : 0;
           if(mode2D) {
-            // Para 2D, posicionamos los paneles en el plano XY
             mesh.position.set(xOffset, yOffset, 0);
           } else {
+            const zOffset = -baseRadius * Math.cos(angle);
             mesh.position.set(xOffset, 0, zOffset);
             const cameraWorldPos = new THREE.Vector3();
             camera.getWorldPosition(cameraWorldPos);
@@ -457,7 +454,7 @@
       currentQuestionStartTime = performance.now();
     }
     
-    // Función para iniciar el juego (usada tanto en AR como en 2D)
+    // Función para iniciar el juego (AR y 2D)
     function startGame() {
       selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
       const inputName = document.getElementById('playerName').value;
@@ -470,7 +467,7 @@
       gameStartTime = performance.now();
     }
     
-    // Inicialización de escena, cámara y renderer
+    // Inicialización de la escena, cámara y renderer
     let initialCameraPos = new THREE.Vector3();
     let initialCameraDir = new THREE.Vector3();
     
@@ -486,13 +483,12 @@
           arSupported = false;
         }
       }
-      // Si no es compatible, activamos modo 2D y usamos una cámara ortográfica
+      // Si no es compatible, activamos modo 2D y usamos cámara ortográfica con near=0.1
       if(!arSupported) {
         mode2D = true;
         const aspect = window.innerWidth / window.innerHeight;
-        // El parámetro "d" define el tamaño en unidades del lado vertical
         const d = 3;
-        camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+        camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 0.1, 1000);
         camera.position.set(0, 0, 10);
         camera.lookAt(0, 0, 0);
       } else {
@@ -502,7 +498,6 @@
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
-      // Forzar que el canvas esté detrás
       renderer.domElement.style.position = 'absolute';
       renderer.domElement.style.top = '0';
       renderer.domElement.style.left = '0';
@@ -546,7 +541,6 @@
       `;
       
       if(arSupported) {
-        // En AR, se agrega el botón AR
         const arButton = ARButton.createButton(renderer, { requiredFeatures });
         arButton.style.position = 'absolute';
         arButton.style.top = '450px';
@@ -572,7 +566,6 @@
           gameStartTime = performance.now();
         });
       } else {
-        // En modo 2D, se agrega un botón "Iniciar Juego"
         overlay.innerHTML += `<button id="startButton">Iniciar Juego</button>`;
         overlay.querySelector('#startButton').addEventListener('click', startGame);
       }
@@ -601,7 +594,7 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     }
     
-    // Display de countdown y score
+    // Countdown y Score
     function startCountdown() {
       gameStartTime = performance.now();
       countdownCanvas = document.createElement('canvas');
@@ -614,9 +607,8 @@
       const geometry = new THREE.PlaneGeometry(0.6, 0.3);
       const material = new THREE.MeshBasicMaterial({ map: countdownTexture, transparent: true });
       countdownMesh = new THREE.Mesh(geometry, material);
-      // En modo 2D, posicionamos el countdown en la parte inferior
       if(mode2D) {
-        countdownMesh.position.set(0, -1.5, 0);
+        countdownMesh.position.set(0, -1.5, -0.1);
       } else {
         countdownMesh.position.set(0, 0.50, -0.82);
       }
@@ -634,9 +626,8 @@
       const geometry = new THREE.PlaneGeometry(0.6, 0.3);
       const material = new THREE.MeshBasicMaterial({ map: scoreTexture, transparent: true });
       scoreMesh = new THREE.Mesh(geometry, material);
-      // En modo 2D, posicionamos el score un poco más abajo
       if(mode2D) {
-        scoreMesh.position.set(0, -1.8, 0);
+        scoreMesh.position.set(0, -1.8, -0.1);
       } else {
         scoreMesh.position.set(0, -0.2, -0.82);
       }
@@ -673,7 +664,7 @@
       scoreTexture.needsUpdate = true;
     }
     
-    // Render loop con detección de colisiones y efectos
+    // Render loop con colisiones y efectos
     function animate() {
       renderer.setAnimationLoop(render);
     }
@@ -728,7 +719,7 @@
         }
       }
       
-      // Detección de colisiones: se usa XR si disponible, sino se usa la posición de la cámara
+      // Colisiones: se usa XR si disponible; sino se usa la posición de la cámara
       const session = renderer.xr.getSession();
       let interactionPoints = [];
       if(session && xrFrame){
@@ -819,7 +810,6 @@
       }
     }
     
-    // Termina el juego y sube el puntaje
     async function endGame() {
       gameOver = true;
       if(questionMesh) scene.remove(questionMesh);
@@ -884,7 +874,6 @@
       drawLeaderboardSegment();
     }
     
-    // Crea la malla del leaderboard con botones de scroll
     function createLeaderboardMesh() {
       if(leaderboardMesh){ scene.remove(leaderboardMesh); leaderboardMesh = null; }
       if(restartButtonMesh){ scene.remove(restartButtonMesh); restartButtonMesh = null; }
@@ -904,19 +893,19 @@
       const lbMaterial = new THREE.MeshBasicMaterial({ map: lbTexture, transparent: true });
       leaderboardMesh = new THREE.Mesh(lbGeometry, lbMaterial);
       leaderboardMesh.userData = { canvas: dummyCanvas, ctx, texture: lbTexture, planeWidth, planeHeight };
-      leaderboardMesh.position.set(0, 0, mode2D ? 0 : -1.2);
+      leaderboardMesh.position.set(0, 0, mode2D ? -0.3 : -1.2);
       scene.add(leaderboardMesh);
       
       restartButtonMesh = createButton("Reiniciar");
-      restartButtonMesh.position.set(0, mode2D ? -1.0 : -0.8, mode2D ? 0 : -1.1);
+      restartButtonMesh.position.set(0, mode2D ? -1.0 : -0.8, mode2D ? -0.3 : -1.1);
       scene.add(restartButtonMesh);
       
       scrollUpButtonMesh = createButton("▲", 0.1, 0.1);
-      scrollUpButtonMesh.position.set(-planeWidth * 0.5 - 0.1, planeHeight * 0.35, mode2D ? 0 : -1.1);
+      scrollUpButtonMesh.position.set(-planeWidth * 0.5 - 0.1, planeHeight * 0.35, mode2D ? -0.3 : -1.1);
       scene.add(scrollUpButtonMesh);
       
       scrollDownButtonMesh = createButton("▼", 0.1, 0.1);
-      scrollDownButtonMesh.position.set(-planeWidth * 0.5 - 0.1, -planeHeight * 0.35, mode2D ? 0 : -1.1);
+      scrollDownButtonMesh.position.set(-planeWidth * 0.5 - 0.1, -planeHeight * 0.35, mode2D ? -0.3 : -1.1);
       scene.add(scrollDownButtonMesh);
     }
     
@@ -970,13 +959,12 @@
       const planeHeight = planeWidth * (canvasHeight/canvasWidth);
       leaderboardMesh.geometry.dispose();
       leaderboardMesh.geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
-      leaderboardMesh.position.set(0, 0, mode2D ? 0 : -1.2);
-      restartButtonMesh.position.set(0, mode2D ? -planeHeight*0.6 : -planeHeight*0.6, mode2D ? 0 : -1.1);
-      scrollUpButtonMesh.position.set(-planeWidth*0.5 - 0.1, planeHeight*0.35, mode2D ? 0 : -1.1);
-      scrollDownButtonMesh.position.set(-planeWidth*0.5 - 0.1, -planeHeight*0.35, mode2D ? 0 : -1.1);
+      leaderboardMesh.position.set(0, 0, mode2D ? -0.3 : -1.2);
+      restartButtonMesh.position.set(0, mode2D ? -planeHeight*0.6 : -planeHeight*0.6, mode2D ? -0.3 : -1.1);
+      scrollUpButtonMesh.position.set(-planeWidth*0.5 - 0.1, planeHeight*0.35, mode2D ? -0.3 : -1.1);
+      scrollDownButtonMesh.position.set(-planeWidth*0.5 - 0.1, -planeHeight*0.35, mode2D ? -0.3 : -1.1);
     }
     
-    // Crea un botón en AR/2D
     function createButton(text, planeWidth = 0.3, planeHeight = 0.1) {
       const canvas = document.createElement('canvas');
       canvas.width = 128 * resolutionFactor;
@@ -997,7 +985,6 @@
       return new THREE.Mesh(geom, mat);
     }
     
-    // Eventos táctiles: desbloquear audio y raycasting
     window.addEventListener('touchstart', function unlockAudio() {
       const successEl = document.getElementById('successSound');
       const errorEl = document.getElementById('errorSound');
@@ -1088,7 +1075,6 @@
       }
     }, false);
     
-    // Reinicia el juego
     function restartGame() {
       if(finalMessageMesh) { scene.remove(finalMessageMesh); finalMessageMesh = null; }
       if(restartButtonMesh) { scene.remove(restartButtonMesh); restartButtonMesh = null; }
@@ -1113,7 +1099,6 @@
       timerSound.play().catch(e=>console.error(e));
     }
     
-    // Inicializa y lanza la animación
     init();
     animate();
   </script>
