@@ -288,7 +288,7 @@
     // Función para crear (o actualizar) los paneles de respuesta (manteniendo posiciones originales)
     // ============================================================================
     function createAnswerObjects(numAnswers, initialCreation) {
-      // Usamos un half-angle que interpola entre 40° (0.698 rad) y 90° (Math.PI/2)
+      // Interpolamos entre un half-angle de 40° (0.698 rad) y 90° (Math.PI/2)
       const minHalfArc = 0.698132; // 40°
       const maxHalfArc = Math.PI / 2; // 90°
       let halfArc = (numAnswers <= 4) ? minHalfArc 
@@ -312,7 +312,7 @@
           ctx.fillStyle = "#FFFFFF";
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          // Generar opciones: usar el correcto y números aleatorios distintos
+          // Generar opciones: el correcto y números aleatorios distintos
           const wrongAnswers = new Set();
           while(wrongAnswers.size < (numAnswers-1)) {
             let wrong = Math.floor(Math.random()*100)+1;
@@ -331,7 +331,6 @@
           const xOffset = radius * Math.sin(angle);
           const zOffset = -radius * Math.cos(angle);
           mesh.position.set(xOffset, 0, zOffset);
-          // Alinear hacia la cámara
           const cameraWorldPos = new THREE.Vector3();
           camera.getWorldPosition(cameraWorldPos);
           const lookAtPos = new THREE.Vector3(cameraWorldPos.x, mesh.position.y, cameraWorldPos.z);
@@ -476,7 +475,7 @@
     }
     
     // ============================================================================
-    // Función para iniciar el juego (compartida entre AR y modo 2D)
+    // Función para iniciar el juego (usada tanto en AR como en 2D)
     // ============================================================================
     function startGame() {
       selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
@@ -502,6 +501,11 @@
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
+      // Posicionar el canvas detrás del overlay
+      renderer.domElement.style.position = 'absolute';
+      renderer.domElement.style.top = '0';
+      renderer.domElement.style.left = '0';
+      renderer.domElement.style.zIndex = '0';
       
       // Comprobar soporte AR
       let arSupported = false;
@@ -544,20 +548,18 @@
         '<div id="leaderboardPreview"></div>' +
         '<input type="text" id="playerName" placeholder="Ingresa tu nombre" style="padding:10px; font-size:16px; margin-bottom:20px;" maxlength="10">';
       
-      // Si es AR, agregar botón AR; si no, un botón de "Iniciar Juego"
       if(arSupported) {
+        // Agregar botón AR
         const arButton = ARButton.createButton(renderer, { requiredFeatures });
         arButton.style.position = 'absolute';
         arButton.style.top = '600px';
-        arButton.style.left = 'calc(50% - 75px)';  /* Centrado, 150px de ancho */
+        arButton.style.left = 'calc(50% - 75px)';
         arButton.style.width = '150px';
         arButton.style.height = '50px';
         arButton.style.fontSize = '16px';
         arButton.style.backgroundColor = 'green';
         arButton.style.color = 'white';
         overlay.appendChild(arButton);
-        
-        // Al iniciarse la sesión AR, se arranca el juego
         renderer.xr.addEventListener('sessionstart', () => {
           camera.getWorldPosition(initialCameraPos);
           camera.getWorldDirection(initialCameraDir);
@@ -573,7 +575,7 @@
           gameStartTime = performance.now();
         });
       } else {
-        // Modo 2D: No mostramos botón AR, sino un botón para iniciar el juego
+        // Modo 2D: Mostrar botón para iniciar juego
         overlay.innerHTML += '<button id="startButton">Iniciar Juego</button>';
         document.getElementById('startButton').addEventListener('click', startGame);
       }
@@ -713,7 +715,7 @@
         }
       }
       
-      // Detección de colisiones: se usa XR si está disponible, sino se utiliza la posición de la cámara
+      // Detección de colisiones: si XR está disponible se usa, sino se usa la posición de la cámara
       const session = renderer.xr.getSession();
       let interactionPoints = [];
       if(session && xrFrame){
@@ -770,9 +772,9 @@
                 const errorSound = document.getElementById('errorSound');
                 const errClone = errorSound.cloneNode();
                 errClone.play().catch(e=>{});
-                answers.forEach(a=>a.material.color.set(0xff0000));
+                answers.forEach(a => a.material.color.set(0xff0000));
                 setTimeout(()=>{
-                  answers.forEach(a=>a.material.color.set(0xffffff));
+                  answers.forEach(a => a.material.color.set(0xffffff));
                   hasCollided = false;
                 },500);
               }
@@ -781,7 +783,6 @@
           }
         }
       } else {
-        // Detección para botón de reinicio o scroll en el leaderboard
         if(restartButtonMesh){
           const btnPos = new THREE.Vector3();
           restartButtonMesh.getWorldPosition(btnPos);
@@ -845,7 +846,6 @@
         });
       }
       
-      // Consultar leaderboard completo para mostrar en AR/2D
       let qLeaderboard = query(
         collection(db, collectionName),
         orderBy("score", "desc")
@@ -898,12 +898,10 @@
       leaderboardMesh.position.set(0, 0, -1.2);
       scene.add(leaderboardMesh);
       
-      // Botón de reinicio
       restartButtonMesh = createButton("Reiniciar");
       restartButtonMesh.position.set(0, -0.8, -1.1);
       scene.add(restartButtonMesh);
       
-      // Botones de scroll
       scrollUpButtonMesh = createButton("▲", 0.1, 0.1);
       scrollUpButtonMesh.position.set(-planeWidth * 0.5 - 0.1, planeHeight * 0.35, -1.1);
       scene.add(scrollUpButtonMesh);
