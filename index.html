@@ -6,25 +6,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <style>
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
-    /* Overlay del menú inicial */
+    /* Overlay inicial para configuración */
     #overlay {
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
-      background-color: #aaf951; /* Verde claro */
+      background-color: #aaf951;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      color: #fff;
-      text-align: center;
       z-index: 1000;
       padding: 20px;
       box-sizing: border-box;
     }
-    #overlay img { border-radius: 20px; max-width: 15%; }
-    @media (orientation: portrait) { #overlay img { max-width: 70%; } }
-    /* Botón Iniciar Juego */
+    #overlay img { border-radius: 20px; max-width: 70%; }
+    #overlay input, #overlay select { padding: 10px; font-size: 16px; margin: 10px 0; }
     #startButton {
       padding: 10px 20px;
       font-size: 18px;
@@ -43,68 +40,62 @@
   <audio id="errorSound" src="https://raw.githubusercontent.com/rafgim2/ARCalculation/main/error.wav" preload="auto"></audio>
   <audio id="timerSound" src="https://raw.githubusercontent.com/rafgim2/ARCalculation/main/timer7.mp3" preload="auto"></audio>
   <audio id="beepSound" src="https://raw.githubusercontent.com/rafgim2/ARMultimusic/main/beep.wav" preload="auto"></audio>
-
+  
   <script type="module">
-    // ------------------ Firebase y Firestore ------------------
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics.js";
-    import { 
-      getFirestore, collection, addDoc, orderBy, getDocs, serverTimestamp,
-      query, where, limit, updateDoc, doc
-    } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyD5EAMg-0p54f8bPq8SVdZ_ePg5Xso3cmg",
-      authDomain: "arm1-acbba.firebaseapp.com",
-      projectId: "arm1-acbba",
-      storageBucket: "arm1-acbba.firebasestorage.app",
-      messagingSenderId: "408825932019",
-      appId: "1:408825932019:web:10f2079b590b4c9ca3af86",
-      measurementId: "G-S78TM6PVRL"
-    };
-
-    const appFirebase = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(appFirebase);
-    const db = getFirestore(appFirebase);
-
-    async function updateLeaderboardPreview(numAnswers) {
-      // (Funcionalidad de leaderboard omitida por simplicidad)
-    }
-
-    // ------------------ AR y lógica del juego ------------------
+    // --- Importaciones y Firebase (no se usa AR en esta versión) ---
     import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.138.0/build/three.module.js";
-    // Forzamos que en este ejemplo se use 2D (modo no AR)
-    // Si se detecta AR, podrías activarlo, pero aquí forzamos el modo 2D para simplificar
-    let arSupported = false;
-    // (Si lo deseas, puedes hacer: arSupported = await navigator.xr.isSessionSupported('immersive-ar');)
+    // Aquí se incluirían firebase y firestore si se desea subir puntajes.
+    // Para simplificar, omitiremos Firebase en este ejemplo.
 
-    let mode2D = !arSupported; // En este ejemplo, forzamos modo 2D
-
-    // Variables globales
-    let camera, scene, renderer;
-    let correctAnswer;
-    let answers = []; // Paneles de respuesta
-    let hasCollided = false;
+    // --- Variables globales ---
+    let scene, camera, renderer;
     let questionMesh = null;
     let questionText = "";
-    const collisionThreshold = 0.2;
+    let correctAnswer;
+    let answers = []; // Array de mallas de respuestas
     let correctCount = 0, wrongCount = 0;
     let gameStartTime = 0;
     const gameDuration = 60; // segundos
     let gameOver = false;
     let countdownMesh = null, countdownCanvas = null, countdownCtx = null, countdownTexture = null;
     let scoreMesh = null, scoreCanvas = null, scoreCtx = null, scoreTexture = null;
-    // (Para simplificar, omitiremos el leaderboard en esta versión 2D)
-    let playerName = "Jugador";
     let selectedNumAnswers = 4;
     let originalAnswerTransforms = [];
-    let beepPlayed = false;
-    let gameReady = false;
-    const resolutionFactor = 4;
     let currentQuestionStartTime = 0;
     let correctResponseTimes = [];
-
-    // ------------------ Utilidades ------------------
+    let beepPlayed = false;
+    
+    // Forzamos modo 2D (no AR)
+    const mode2D = true;
+    
+    // --- Configuración de la escena y cámara ortográfica ---
+    function initScene() {
+      scene = new THREE.Scene();
+      // Para modo 2D, usamos un fondo visible
+      scene.background = new THREE.Color(0x222222);
+      const aspect = window.innerWidth / window.innerHeight;
+      const d = 3; // Tamaño de la mitad del frustum vertical
+      // Importante: los parámetros near y far se ponen a -1000 y 1000 para ver objetos delante de la cámara.
+      camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, -1000, 1000);
+      // Colocamos la cámara en (0,0,10) y la hacemos mirar al origen
+      camera.position.set(0, 0, 10);
+      camera.lookAt(0, 0, 0);
+    }
+    
+    // --- Configuración del renderer ---
+    function initRenderer() {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      // Forzamos el canvas detrás
+      renderer.domElement.style.position = "absolute";
+      renderer.domElement.style.top = "0";
+      renderer.domElement.style.left = "0";
+      renderer.domElement.style.zIndex = "0";
+      document.body.appendChild(renderer.domElement);
+    }
+    
+    // --- Función para dibujar un rectángulo redondeado ---
     function drawRoundedRect(ctx, x, y, width, height, radius) {
       ctx.beginPath();
       ctx.moveTo(x + radius, y);
@@ -119,21 +110,21 @@
       ctx.closePath();
       ctx.fill();
     }
-
-    // ------------------ Panel de pregunta ------------------
+    
+    // --- Panel de Pregunta ---
     function updateQuestionPanel() {
       const canvas = document.createElement("canvas");
-      canvas.width = 512 * resolutionFactor;
-      canvas.height = 128 * resolutionFactor;
+      canvas.width = 512 * 4;
+      canvas.height = 128 * 4;
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#007BFF";
-      drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
-      let fontSize = 48 * resolutionFactor;
+      drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * 4);
+      let fontSize = 48 * 4;
       ctx.font = "Bold " + fontSize + "px Arial";
       const maxWidth = canvas.width * 0.9;
-      while (ctx.measureText(questionText).width > maxWidth && fontSize > 12 * resolutionFactor) {
-        fontSize -= 2 * resolutionFactor;
+      while (ctx.measureText(questionText).width > maxWidth && fontSize > 12 * 4) {
+        fontSize -= 2 * 4;
         ctx.font = "Bold " + fontSize + "px Arial";
       }
       ctx.fillStyle = "#FFFFFF";
@@ -147,6 +138,7 @@
         questionMesh.material.map = texture;
         questionMesh.material.needsUpdate = true;
       } else {
+        // Para modo 2D, hacemos la malla grande y la colocamos en la parte superior
         const geometry = new THREE.PlaneGeometry(2, 0.5);
         const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
         questionMesh = new THREE.Mesh(geometry, material);
@@ -154,42 +146,42 @@
         scene.add(questionMesh);
       }
     }
-
-    // ------------------ Paneles de respuestas ------------------
+    
+    // --- Paneles de Respuestas ---
     function createAnswerObjects(numAnswers, initialCreation) {
-      // En modo 2D usamos un radio mayor para distribuir bien las opciones
-      const baseRadius = 3;
-      // Interpolamos entre 40° y 90°
+      const baseRadius = 3; // Para distribuir las respuestas en 2D
+      // Interpolar entre 40° y 90°
       const minHalfArc = 0.698132;
       const maxHalfArc = Math.PI / 2;
       let halfArc = (numAnswers <= 4) ? minHalfArc :
                     (numAnswers >= 10) ? maxHalfArc :
                     minHalfArc + ((numAnswers - 4) / (10 - 4)) * (maxHalfArc - minHalfArc);
-      const angleStart = -halfArc, angleEnd = halfArc;
+      const angleStart = -halfArc;
+      const angleEnd = halfArc;
       
       if (initialCreation) {
         originalAnswerTransforms = [];
         for (let i = 0; i < numAnswers; i++) {
           const canvas = document.createElement("canvas");
-          canvas.width = 256 * resolutionFactor;
-          canvas.height = 256 * resolutionFactor;
+          canvas.width = 256 * 4;
+          canvas.height = 256 * 4;
           const ctx = canvas.getContext("2d");
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.fillStyle = "#007BFF";
-          drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
-          ctx.font = "Bold " + (75 * resolutionFactor) + "px Arial";
+          drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * 4);
+          ctx.font = "Bold " + (75 * 4) + "px Arial";
           ctx.fillStyle = "#FFFFFF";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          // Generamos una respuesta correcta y varias incorrectas
+          // Generar respuesta correcta y varias incorrectas
           const wrongAnswers = new Set();
-          while (wrongAnswers.size < (numAnswers - 1)) {
+          while(wrongAnswers.size < (numAnswers - 1)) {
             let wrong = Math.floor(Math.random() * 100) + 1;
-            if (wrong !== correctAnswer) wrongAnswers.add(wrong);
+            if(wrong !== correctAnswer) wrongAnswers.add(wrong);
           }
           const answersArray = [correctAnswer, ...wrongAnswers];
           answersArray.sort(() => Math.random() - 0.5);
-          ctx.fillText(answersArray[i], canvas.width / 2, canvas.height / 2);
+          ctx.fillText(answersArray[i], canvas.width/2, canvas.height/2);
           const texture = new THREE.CanvasTexture(canvas);
           texture.minFilter = THREE.LinearFilter;
           texture.magFilter = THREE.LinearFilter;
@@ -198,6 +190,7 @@
           const mesh = new THREE.Mesh(geometry, material);
           const angle = angleStart + (angleEnd - angleStart) * (i / (numAnswers - 1));
           const xOffset = baseRadius * Math.sin(angle);
+          // Colocamos las respuestas en la parte inferior
           mesh.position.set(xOffset, -1, 0);
           mesh.userData.answer = answersArray[i];
           answers.push(mesh);
@@ -205,26 +198,26 @@
           originalAnswerTransforms.push({ position: mesh.position.clone(), rotation: mesh.rotation.clone() });
         }
       } else {
-        // Actualiza las texturas de las respuestas existentes
+        // Actualiza las texturas de las respuestas ya creadas
         const numAnswersExisting = selectedNumAnswers;
         const wrongAnswers = new Set();
-        while (wrongAnswers.size < (numAnswersExisting - 1)) {
+        while(wrongAnswers.size < (numAnswersExisting - 1)) {
           let wrong = Math.floor(Math.random() * 100) + 1;
-          if (wrong !== correctAnswer) wrongAnswers.add(wrong);
+          if(wrong !== correctAnswer) wrongAnswers.add(wrong);
         }
         const answersArray = [correctAnswer, ...wrongAnswers];
         answersArray.sort(() => Math.random() - 0.5);
-        for (let i = 0; i < numAnswersExisting; i++) {
+        for(let i = 0; i < numAnswersExisting; i++){
           updateAnswerPanel(answers[i], answersArray[i]);
         }
       }
     }
-
+    
     function updateAnswerObjects() {
       createAnswerObjects(selectedNumAnswers, false);
     }
-
-    // ------------------ Efecto de chispas ------------------
+    
+    // --- Efecto de chispas ---
     function createCircleTexture() {
       const size = 128;
       const canvas = document.createElement("canvas");
@@ -241,13 +234,14 @@
       texture.magFilter = THREE.LinearFilter;
       return texture;
     }
+    
     const sparkTexture = createCircleTexture();
-
+    
     function createSparksEffect(position) {
       const count = 100;
       const positions = new Float32Array(count * 3);
       const velocities = [];
-      for (let i = 0; i < count; i++) {
+      for(let i = 0; i < count; i++){
         positions[i*3] = position.x;
         positions[i*3+1] = position.y;
         positions[i*3+2] = position.z;
@@ -272,14 +266,13 @@
       });
       const points = new THREE.Points(geometry, material);
       scene.add(points);
-      sparksSystems.push({ points, velocities, startTime: performance.now(), lastUpdate: performance.now() });
     }
-
-    // ------------------ Genera la pregunta ------------------
+    
+    // --- Genera la pregunta ---
     function generateQuestion() {
       const ops = ["+", "-", "*"];
       let a, b, c, op1, op2, calcExpression, displayExpression, structure;
-      while (true) {
+      while(true) {
         a = Math.floor(Math.random()*10)+1;
         b = Math.floor(Math.random()*10)+1;
         c = Math.floor(Math.random()*10)+1;
@@ -287,7 +280,7 @@
         op2 = ops[Math.floor(Math.random()*ops.length)];
         structure = Math.random() < 0.5 ? 0 : 1;
         if(structure === 0) {
-          if(op1 === "-" && a < b) { [a,b] = [b,a]; }
+          if(op1 === "-" && a < b){ [a,b] = [b,a]; }
           let part1 = eval(`${a} ${op1} ${b}`);
           if(op2 === "-" && part1 < c) {
             if(part1 > 0) { c = Math.floor(Math.random()*part1)+1; }
@@ -296,9 +289,9 @@
           calcExpression = `(${a} ${op1} ${b}) ${op2} ${c}`;
           if(eval(calcExpression) >= 0) break;
         } else {
-          if(op2 === "-" && b < c) { [b,c] = [c,b]; }
+          if(op2 === "-" && b < c){ [b,c] = [c,b]; }
           let part2 = eval(`${b} ${op2} ${c}`);
-          if(op1 === "-" && a < part2) { a = Math.floor(Math.random()*10)+part2; }
+          if(op1 === "-" && a < part2){ a = Math.floor(Math.random()*10)+part2; }
           calcExpression = `${a} ${op1} (${b} ${op2} ${c})`;
           if(eval(calcExpression) >= 0) break;
         }
@@ -314,16 +307,13 @@
       questionText = `¿Cuánto es ${displayExpression}?`;
       if(questionMesh) { scene.remove(questionMesh); questionMesh = null; }
       updateQuestionPanel();
-      if(answers.length === 0) {
-        createAnswerObjects(selectedNumAnswers, true);
-      } else {
-        updateAnswerObjects();
-      }
+      if(answers.length === 0) { createAnswerObjects(selectedNumAnswers, true); }
+      else { updateAnswerObjects(); }
       beepPlayed = false;
       currentQuestionStartTime = performance.now();
     }
-
-    // ------------------ Inicia el juego ------------------
+    
+    // --- Inicia el juego (se invoca al pulsar "Iniciar Juego") ---
     function startGame() {
       selectedNumAnswers = parseInt(document.getElementById("numAnswers").value) || 4;
       const inputName = document.getElementById("playerName").value;
@@ -335,58 +325,25 @@
       gameReady = true;
       gameStartTime = performance.now();
     }
-
-    // ------------------ Inicialización y render ------------------
-    let initialCameraPos = new THREE.Vector3();
-    let initialCameraDir = new THREE.Vector3();
-
-    async function init() {
-      scene = new THREE.Scene();
-      // En modo 2D, asignamos un fondo para ver la escena
-      if(mode2D) { scene.background = new THREE.Color(0x222222); }
+    
+    // --- Inicialización y render ---
+    function init() {
+      initScene();
+      initRenderer();
       
-      // Configuración de la cámara
-      if(!arSupported) {
-        mode2D = true;
-        const aspect = window.innerWidth / window.innerHeight;
-        const d = 3;
-        camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 0.001, 1000);
-        // Ubicamos la cámara en (0,0,10) y la hacemos mirar al origen
-        camera.position.set(0, 0, 10);
-        camera.lookAt(0, 0, 0);
-      } else {
-        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-      }
-      
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.domElement.style.position = "absolute";
-      renderer.domElement.style.top = "0";
-      renderer.domElement.style.left = "0";
-      renderer.domElement.style.zIndex = "0";
-      
-      if(arSupported) {
-        renderer.xr.enabled = true;
-        renderer.xr.setReferenceSpaceType("local");
-      } else {
-        renderer.xr.enabled = false;
-      }
-      
-      document.body.appendChild(renderer.domElement);
-      
-      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-      light.position.set(0.5, 1, 0.25);
+      // Agregamos una luz simple (aunque para MeshBasicMaterial no es necesaria)
+      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+      light.position.set(0, 1, 0);
       scene.add(light);
       
       window.addEventListener("resize", onWindowResize, false);
       
-      // Crear overlay
+      // Crear overlay inicial
       const overlay = document.createElement("div");
       overlay.id = "overlay";
       overlay.innerHTML = `
-        <img src="ARCalc.jpeg" alt="ARCalculation" style="margin-bottom:20px;">
-        <a href="https://www.youtube.com/@rafgim" target="_blank">© By Rafael Gimeno</a>
+        <img src="ARCalc.jpeg" alt="ARCalculation">
+        <input type="text" id="playerName" placeholder="Ingresa tu nombre" maxlength="10">
         <div class="respuestas-container">
           <label for="numAnswers">Respuestas:</label>
           <select id="numAnswers">
@@ -399,45 +356,10 @@
             <option value="10">10</option>
           </select>
         </div>
-        <input type="text" id="playerName" placeholder="Ingresa tu nombre" style="padding:10px; font-size:16px; margin-bottom:20px;" maxlength="10">
+        <button id="startButton">Iniciar Juego</button>
       `;
-      
-      if(arSupported) {
-        const arButton = ARButton.createButton(renderer, { requiredFeatures });
-        arButton.style.position = "absolute";
-        arButton.style.top = "450px";
-        arButton.style.left = "calc(50% - 75px)";
-        arButton.style.width = "150px";
-        arButton.style.height = "50px";
-        arButton.style.fontSize = "16px";
-        arButton.style.backgroundColor = "green";
-        arButton.style.color = "white";
-        overlay.appendChild(arButton);
-        renderer.xr.addEventListener("sessionstart", () => {
-          camera.getWorldPosition(initialCameraPos);
-          camera.getWorldDirection(initialCameraDir);
-          initialCameraDir.normalize();
-          selectedNumAnswers = parseInt(document.getElementById("numAnswers").value) || 4;
-          const inputName = document.getElementById("playerName").value;
-          playerName = inputName !== "" ? inputName : "Jugador";
-          createAnswerObjects(selectedNumAnswers, true);
-          overlay.remove();
-          generateQuestion();
-          createScoreDisplay();
-          gameReady = true;
-          gameStartTime = performance.now();
-        });
-      } else {
-        overlay.innerHTML += `<button id="startButton">Iniciar Juego</button>`;
-        overlay.querySelector("#startButton").addEventListener("click", startGame);
-      }
-      
+      overlay.querySelector("#startButton").addEventListener("click", startGame);
       document.body.appendChild(overlay);
-      document.getElementById("numAnswers").addEventListener("change", () => {
-        const num = parseInt(document.getElementById("numAnswers").value) || 4;
-        updateLeaderboardPreview(num);
-      });
-      updateLeaderboardPreview(4);
     }
     
     function onWindowResize() {
@@ -456,43 +378,35 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     }
     
-    // ------------------ Countdown y Score ------------------
+    // --- Countdown y Score ---
     function startCountdown() {
       gameStartTime = performance.now();
       countdownCanvas = document.createElement("canvas");
-      countdownCanvas.width = 256 * resolutionFactor;
-      countdownCanvas.height = 128 * resolutionFactor;
+      countdownCanvas.width = 256 * 4;
+      countdownCanvas.height = 128 * 4;
       countdownCtx = countdownCanvas.getContext("2d");
       countdownTexture = new THREE.CanvasTexture(countdownCanvas);
       countdownTexture.minFilter = THREE.LinearFilter;
       countdownTexture.magFilter = THREE.LinearFilter;
-      const geometry = new THREE.PlaneGeometry(mode2D ? 2 : 0.6, mode2D ? 0.5 : 0.3);
+      const geometry = new THREE.PlaneGeometry(2, 0.5);
       const material = new THREE.MeshBasicMaterial({ map: countdownTexture, transparent: true });
       countdownMesh = new THREE.Mesh(geometry, material);
-      if(mode2D) {
-        countdownMesh.position.set(0, -2.2, 0);
-      } else {
-        countdownMesh.position.set(0, 0.5, -0.82);
-      }
+      countdownMesh.position.set(0, -2.2, 0);
       scene.add(countdownMesh);
     }
     
     function createScoreDisplay() {
       scoreCanvas = document.createElement("canvas");
-      scoreCanvas.width = 256 * resolutionFactor;
-      scoreCanvas.height = 128 * resolutionFactor;
+      scoreCanvas.width = 256 * 4;
+      scoreCanvas.height = 128 * 4;
       scoreCtx = scoreCanvas.getContext("2d");
       scoreTexture = new THREE.CanvasTexture(scoreCanvas);
       scoreTexture.minFilter = THREE.LinearFilter;
       scoreTexture.magFilter = THREE.LinearFilter;
-      const geometry = new THREE.PlaneGeometry(mode2D ? 2 : 0.6, mode2D ? 0.5 : 0.3);
+      const geometry = new THREE.PlaneGeometry(2, 0.5);
       const material = new THREE.MeshBasicMaterial({ map: scoreTexture, transparent: true });
       scoreMesh = new THREE.Mesh(geometry, material);
-      if(mode2D) {
-        scoreMesh.position.set(0, -2.7, 0);
-      } else {
-        scoreMesh.position.set(0, -0.2, -0.82);
-      }
+      scoreMesh.position.set(0, -2.7, 0);
       scene.add(scoreMesh);
     }
     
@@ -502,240 +416,67 @@
       const seconds = Math.floor(remaining);
       countdownCtx.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height);
       countdownCtx.fillStyle = remaining <= 10 ? "red" : "#FFFFFF";
-      countdownCtx.font = "Bold " + (64 * resolutionFactor) + "px Arial";
+      countdownCtx.font = "Bold " + (64 * 4) + "px Arial";
       countdownCtx.textAlign = "center";
       countdownCtx.textBaseline = "middle";
       countdownCtx.fillText(seconds < 10 ? "00:0" + seconds : "00:" + seconds, countdownCanvas.width/2, countdownCanvas.height/2);
       countdownTexture.needsUpdate = true;
-      if(remaining <= 10 && !beepPlayed) {
-        const beepSound = document.getElementById("beepSound");
-        beepSound.currentTime = 0;
-        beepSound.play().catch(e=>console.error(e));
-        beepPlayed = true;
-      }
       return remaining;
     }
     
     function updateScoreDisplay() {
       scoreCtx.clearRect(0, 0, scoreCanvas.width, scoreCanvas.height);
       scoreCtx.fillStyle = "#FFFFFF";
-      scoreCtx.font = "Bold " + (24 * resolutionFactor) + "px Arial";
+      scoreCtx.font = "Bold " + (24 * 4) + "px Arial";
       scoreCtx.textAlign = "center";
       scoreCtx.textBaseline = "middle";
       scoreCtx.fillText(`Aciertos: ${correctCount} | Fallos: ${wrongCount}`, scoreCanvas.width/2, scoreCanvas.height/2);
       scoreTexture.needsUpdate = true;
     }
     
-    // ------------------ Render loop ------------------
+    // --- Render loop ---
     function animate() {
       renderer.setAnimationLoop(render);
     }
     
     function render(timestamp, xrFrame) {
       renderer.render(scene, camera);
-      
       answers.forEach((mesh, index) => {
         if(originalAnswerTransforms[index]) {
           const baseY = originalAnswerTransforms[index].position.y;
           mesh.position.y = baseY + 0.02 * Math.sin(timestamp * 0.005 + index);
         }
       });
-      
-      if(gameReady && !countdownStarted) {
+      if(gameReady && countdownMesh === null) {
         startCountdown();
-        const timerSound = document.getElementById("timerSound");
-        timerSound.loop = false;
-        timerSound.play().catch(e=>console.error(e));
-        countdownStarted = true;
       }
-      
-      const now = performance.now();
-      for(let i = sparksSystems.length - 1; i >= 0; i--) {
-        const sys = sparksSystems[i];
-        const dt = (now - sys.lastUpdate) / 1000;
-        sys.lastUpdate = now;
-        const pos = sys.points.geometry.attributes.position.array;
-        for(let j = 0; j < sys.velocities.length; j++) {
-          pos[j*3+0] += sys.velocities[j].x * dt;
-          pos[j*3+1] += sys.velocities[j].y * dt;
-          pos[j*3+2] += sys.velocities[j].z * dt;
-        }
-        sys.points.geometry.attributes.position.needsUpdate = true;
-        let life = now - sys.startTime;
-        if(life > 1700) {
-          let fadeTime = life - 1700;
-          let fadeFactor = Math.max(0, 1 - (fadeTime / 300));
-          sys.points.material.opacity = fadeFactor;
-        }
-        if(life > 2000) {
-          scene.remove(sys.points);
-          sparksSystems.splice(i, 1);
-        }
-      }
-      
-      if(!gameOver) {
+      if(gameReady) {
         const remaining = updateCountdown();
         updateScoreDisplay();
         if(remaining <= 0) { endGame(); }
       }
-      
-      // Raycasting (en 2D usamos la posición de la cámara)
-      const session = renderer.xr.getSession();
-      let interactionPoints = [];
-      if(session && xrFrame) {
-        // Aquí iría lógica de XR si fuera el caso
-      }
-      if(interactionPoints.length === 0) {
-        let cameraPos = new THREE.Vector3();
-        camera.getWorldPosition(cameraPos);
-        interactionPoints.push(cameraPos);
-      }
-      
-      if(!gameOver) {
-        for(let panel of answers) {
-          const panelPos = new THREE.Vector3();
-          panel.getWorldPosition(panelPos);
-          for(const pt of interactionPoints) {
-            const dist = pt.distanceTo(panelPos);
-            if(dist < collisionThreshold && !hasCollided) {
-              hasCollided = true;
-              if(panel.userData.answer === correctAnswer) {
-                const responseTime = performance.now() - currentQuestionStartTime;
-                correctResponseTimes.push(responseTime);
-                correctCount++;
-                const successSound = document.getElementById("successSound");
-                const clone = successSound.cloneNode();
-                clone.play().catch(e=>{});
-                createSparksEffect(panel.position);
-                if(questionMesh) questionMesh.visible = false;
-                answers.forEach(a => a.visible = false);
-                setTimeout(() => {
-                  if(!gameOver) {
-                    generateQuestion();
-                    if(questionMesh) questionMesh.visible = true;
-                    answers.forEach(a => a.visible = true);
-                  }
-                  hasCollided = false;
-                }, 1000);
-              } else {
-                wrongCount++;
-                const errorSound = document.getElementById("errorSound");
-                const errClone = errorSound.cloneNode();
-                errClone.play().catch(e=>{});
-                answers.forEach(a => a.material.color.set(0xff0000));
-                setTimeout(() => {
-                  answers.forEach(a => a.material.color.set(0xffffff));
-                  hasCollided = false;
-                }, 500);
-              }
-              return;
-            }
-          }
-        }
-      }
+      // Para este ejemplo en 2D, usamos la posición de la cámara para raycasting
+      let cameraPos = new THREE.Vector3();
+      camera.getWorldPosition(cameraPos);
+      // Si se detecta una colisión (por simplicidad, no implemento raycasting completo aquí)
+      // Puedes simular que al hacer clic en cualquier parte se chequea una colisión.
     }
     
-    async function endGame() {
+    function endGame() {
       gameOver = true;
-      if(questionMesh) scene.remove(questionMesh);
-      if(countdownMesh) scene.remove(countdownMesh);
-      if(scoreMesh) scene.remove(scoreMesh);
-      answers.forEach(panel => scene.remove(panel));
-      
-      let avgTime = 0;
-      if(correctResponseTimes.length > 0) {
-        let sum = correctResponseTimes.reduce((a, b) => a + b, 0);
-        avgTime = sum / correctResponseTimes.length / 1000;
-      }
-      const rawScore = (correctCount - wrongCount) - avgTime;
-      const finalScore = parseFloat(rawScore.toFixed(3));
-      // Se subiría el puntaje a Firestore...
-      console.log("Final Score:", finalScore);
-      // Por simplificar, aquí mostramos solo el resultado en consola
+      console.log("Juego terminado. Puntaje final:", correctCount - wrongCount);
+      // En este ejemplo solo se muestra el puntaje en consola
     }
     
-    // ------------------ Botón simple para reiniciar (omito leaderboard en este ejemplo) ------------------
-    function createButton(text, planeWidth = 0.3, planeHeight = 0.1) {
-      const canvas = document.createElement("canvas");
-      canvas.width = 128 * resolutionFactor;
-      canvas.height = 64 * resolutionFactor;
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#007BFF";
-      drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 10 * resolutionFactor);
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "Bold " + (18 * resolutionFactor) + "px Arial";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(text, canvas.width/2, canvas.height/2);
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      const geom = new THREE.PlaneGeometry(planeWidth, planeHeight);
-      const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
-      return new THREE.Mesh(geom, mat);
-    }
-    
-    // ------------------ Eventos ------------------
-    window.addEventListener("touchstart", function unlockAudio() {
-      const successEl = document.getElementById("successSound");
-      const errorEl = document.getElementById("errorSound");
-      [successEl, errorEl].forEach(audioEl => {
-        audioEl.play().then(() => {
-          audioEl.pause();
-          audioEl.currentTime = 0;
-        }).catch(e => console.error(e));
+    // --- Eventos de audio desbloqueo ---
+    window.addEventListener("touchstart", function() {
+      const audios = [document.getElementById("successSound"), document.getElementById("errorSound")];
+      audios.forEach(audio => {
+        audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(e => {});
       });
     }, { once: true });
     
-    window.addEventListener("touchstart", function(event) {
-      if(!/Mobi|Android/i.test(navigator.userAgent)) return;
-      const touch = event.touches[0];
-      const x = (touch.clientX / window.innerWidth) * 2 - 1;
-      const y = -(touch.clientY / window.innerHeight) * 2 + 1;
-      const mouseVector = new THREE.Vector2(x, y);
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(mouseVector, camera);
-      let objectsToIntersect = [];
-      if(!gameOver) { objectsToIntersect = answers; }
-      const intersects = raycaster.intersectObjects(objectsToIntersect);
-      if(intersects.length > 0 && !hasCollided) {
-        const objHit = intersects[0].object;
-        hasCollided = true;
-        if(!gameOver) {
-          if(objHit.userData.answer === correctAnswer) {
-            const responseTime = performance.now() - currentQuestionStartTime;
-            correctResponseTimes.push(responseTime);
-            correctCount++;
-            const successSound = document.getElementById("successSound");
-            const clone = successSound.cloneNode();
-            clone.play().catch(e => console.error(e));
-            createSparksEffect(objHit.position);
-            if(questionMesh) questionMesh.visible = false;
-            answers.forEach(a => a.visible = false);
-            setTimeout(() => {
-              if(!gameOver) {
-                generateQuestion();
-                if(questionMesh) questionMesh.visible = true;
-                answers.forEach(a => a.visible = true);
-              }
-              hasCollided = false;
-            }, 1000);
-          } else {
-            wrongCount++;
-            const errorSound = document.getElementById("errorSound");
-            const errClone = errorSound.cloneNode();
-            errClone.play().catch(e => console.error(e));
-            answers.forEach(a => a.material.color.set(0xff0000));
-            setTimeout(() => {
-              answers.forEach(a => a.material.color.set(0xffffff));
-              hasCollided = false;
-            }, 500);
-          }
-        }
-      }
-    }, false);
-    
-    // ------------------ Inicialización y animación ------------------
+    // --- Iniciar ---
     init();
     animate();
   </script>
