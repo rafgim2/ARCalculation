@@ -5,12 +5,13 @@
     <title>AR MULTIMUSIC / HTML MULTIMUSIC</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <style>
+      /* Estilos generales */
       body {
         margin: 0;
         font-family: sans-serif;
         overflow-y: auto;
       }
-      /* Overlay del menú inicial */
+      /* Overlay del menú inicial (igual para ambos modos) */
       #overlay {
         position: absolute;
         top: 0;
@@ -24,6 +25,7 @@
         align-items: center;
         text-align: center;
         z-index: 10;
+        overflow-y: auto;
         box-sizing: border-box;
         padding: 20px;
       }
@@ -34,7 +36,7 @@
         color: blue;
         text-decoration: none;
       }
-      /* Selector de respuestas */
+      /* Contenedor para el selector de respuestas */
       #overlay .respuestas-container {
         display: flex;
         align-items: center;
@@ -48,7 +50,7 @@
       #overlay .respuestas-container select {
         font-size: 14px;
       }
-      /* Imagen en el overlay */
+      /* Imagen */
       #overlay img {
         border-radius: 20px;
         max-width: 15%;
@@ -60,7 +62,7 @@
           max-width: 70%;
         }
       }
-      /* Mini tabla (top 3) */
+      /* Tabla de clasificación en el overlay */
       #leaderboardPreview {
         max-width: 80%;
         max-height: 120px;
@@ -82,7 +84,7 @@
         padding: 4px;
         text-align: center;
       }
-      /* Modo HTML (fallback) */
+      /* Estilos para la versión HTML (modo “tradicional”) */
       #gameContainer {
         position: relative;
         width: 100%;
@@ -123,7 +125,7 @@
     <audio id="errorSound" src="https://raw.githubusercontent.com/rafgim2/ARMultimusic/main/error.wav" preload="auto"></audio>
     <audio id="timerSound" src="https://raw.githubusercontent.com/rafgim2/ARMultimusic/main/timer7.mp3" preload="auto"></audio>
     <audio id="beepSound" src="https://raw.githubusercontent.com/rafgim2/ARMultimusic/main/beep.wav" preload="auto"></audio>
-
+    
     <script type="module">
       /***** IMPORTACIONES: Firebase, Firestore, Three.js y ARButton *****/
       import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
@@ -150,7 +152,7 @@
       const analytics = getAnalytics(appFirebase);
       const db = getFirestore(appFirebase);
       
-      /***** VARIABLES GLOBALES (compartidas en AR y HTML) *****/
+      /***** VARIABLES GLOBALES DEL JUEGO (AR y HTML) *****/
       let correctAnswer;
       let questionText = "";
       let correctCount = 0;
@@ -167,37 +169,37 @@
       function generateNewQuestion() {
         const ops = ["+", "-", "*"];
         let a, b, c, op1, op2, calcExpression, displayExpression, structure;
-        while(true){
+        while (true) {
           a = Math.floor(Math.random() * 10) + 1;
           b = Math.floor(Math.random() * 10) + 1;
           c = Math.floor(Math.random() * 10) + 1;
           op1 = ops[Math.floor(Math.random() * ops.length)];
           op2 = ops[Math.floor(Math.random() * ops.length)];
           structure = Math.random() < 0.5 ? 0 : 1;
-          if(structure === 0){
-            if(op1 === '-' && a < b){ [a, b] = [b, a]; }
+          if (structure === 0) {
+            if (op1 === '-' && a < b) { [a, b] = [b, a]; }
             let part1 = eval(`${a} ${op1} ${b}`);
-            if(op2 === '-' && part1 < c){
-              if(part1 > 0){
+            if (op2 === '-' && part1 < c) {
+              if (part1 > 0) {
                 c = Math.floor(Math.random() * part1) + 1;
               } else { continue; }
             }
             calcExpression = `(${a} ${op1} ${b}) ${op2} ${c}`;
-            if(eval(calcExpression) >= 0) break;
+            if (eval(calcExpression) >= 0) break;
           } else {
-            if(op2 === '-' && b < c){ [b, c] = [c, b]; }
+            if (op2 === '-' && b < c) { [b, c] = [c, b]; }
             let part2 = eval(`${b} ${op2} ${c}`);
-            if(op1 === '-' && a < part2){
+            if (op1 === '-' && a < part2) {
               a = Math.floor(Math.random() * 10) + part2;
             }
             calcExpression = `${a} ${op1} (${b} ${op2} ${c})`;
-            if(eval(calcExpression) >= 0) break;
+            if (eval(calcExpression) >= 0) break;
           }
         }
         correctAnswer = eval(calcExpression);
         const displayOp1 = op1 === "*" ? "x" : op1;
         const displayOp2 = op2 === "*" ? "x" : op2;
-        if(structure === 0){
+        if (structure === 0) {
           displayExpression = `(${a} ${displayOp1} ${b}) ${displayOp2} ${c}`;
         } else {
           displayExpression = `${a} ${displayOp1} (${b} ${displayOp2} ${c})`;
@@ -206,132 +208,28 @@
       }
       
       /***** MODO AR *****/
-      // Variables para AR
-      let camera, scene, renderer;
+      // Estas funciones se mantienen igual que en tu código inicial
+      let scene, camera, renderer;
       let questionMesh = null;
       let answers = [];
       let originalAnswerTransforms = null;
       let beepPlayed = false;
       let gameReady = false;
       let countdownStarted = false;
-      const collisionThreshold = 0.3;
-      const sparksSystems = [];
       const resolutionFactor = 4;
       
-      function initAR() {
-        // Crear escena, cámara y renderer
-        scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.xr.enabled = true;
-        document.body.appendChild(renderer.domElement);
-        const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-        light.position.set(0.5, 1, 0.25);
-        scene.add(light);
-        window.addEventListener('resize', () => {
-          camera.aspect = window.innerWidth / window.innerHeight;
-          camera.updateProjectionMatrix();
-          renderer.setSize(window.innerWidth, window.innerHeight);
-        }, false);
-        
-        // Crear overlay de inicio
-        const overlay = document.createElement('div');
-        overlay.id = 'overlay';
-        overlay.innerHTML = `
-          <img src="ARM2.jpeg" alt="AR Mult">
-          <a href="https://www.youtube.com/@rafgim" target="_blank">© By Rafael Gimeno</a>
-          <div class="respuestas-container">
-            <label for="numAnswers">Respuestas:</label>
-            <select id="numAnswers">
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
-              <option value="9">9</option>
-              <option value="10">10</option>
-            </select>
-          </div>
-          <div id="leaderboardPreview"></div>
-          <input type="text" id="playerName" placeholder="Ingresa tu nombre" maxlength="10">
-        `;
-        document.body.appendChild(overlay);
-        document.getElementById('numAnswers').addEventListener('change', () => {
-          const num = parseInt(document.getElementById('numAnswers').value) || 4;
-          updateLeaderboardPreview(num);
-        });
-        updateLeaderboardPreview(4);
-        selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
-        playerName = document.getElementById('playerName').value.trim() || "Jugador";
-        
-        (async () => {
-          let arSupported = false;
-          if (navigator.xr) {
-            try {
-              arSupported = await navigator.xr.isSessionSupported('immersive-ar');
-            } catch(e) {
-              arSupported = false;
-            }
-          }
-          if (arSupported) {
-            const requiredFeatures = /Mobi|Android/i.test(navigator.userAgent)
-              ? ['hit-test']
-              : ['hit-test', 'hand-tracking'];
-            const arButton = ARButton.createButton(renderer, { requiredFeatures });
-            arButton.style.position = 'absolute';
-            arButton.style.top = '600px';
-            arButton.style.left = 'calc(50% - 75px)';
-            arButton.style.width = '150px';
-            arButton.style.height = '50px';
-            arButton.style.fontSize = '16px';
-            arButton.style.backgroundColor = 'green';
-            arButton.style.color = 'white';
-            // Al pulsar el botón AR, ocultamos el overlay inmediatamente
-            arButton.addEventListener('click', () => {
-              console.log("Botón AR pulsado: ocultando overlay");
-              overlay.style.display = 'none';
-            });
-            overlay.appendChild(arButton);
-          } else {
-            const startBtn = document.createElement('button');
-            startBtn.style.fontSize = '16px';
-            startBtn.style.padding = '10px 20px';
-            startBtn.style.marginTop = '20px';
-            startBtn.innerText = "AR no compatible, Iniciar Juego HTML";
-            startBtn.onclick = () => {
-              selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
-              playerName = document.getElementById('playerName').value.trim() || "Jugador";
-              overlay.remove();
-              renderer.domElement.style.display = 'none';
-              initHTML();
-            };
-            overlay.appendChild(startBtn);
-          }
-          document.body.appendChild(overlay);
-          document.getElementById('numAnswers').addEventListener('change', () => {
-            const num = parseInt(document.getElementById('numAnswers').value) || 4;
-            updateLeaderboardPreview(num);
-          });
-          updateLeaderboardPreview(4);
-          
-          renderer.xr.addEventListener('sessionstart', () => {
-            console.log("XR session started");
-            selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
-            const inputName = document.getElementById('playerName').value;
-            playerName = (inputName !== "") ? inputName : "Jugador";
-            createAnswerObjects(selectedNumAnswers, true);
-            // Aquí el overlay ya se ha ocultado
-            generateQuestion();
-            createScoreDisplay();
-            gameReady = true;
-            gameStartTime = performance.now();
-          });
-        })();
+      function generateQuestion() {
+        generateNewQuestion();
+        if (questionMesh) {
+          scene.remove(questionMesh);
+          questionMesh = null;
+        }
+        updateQuestionPanel();
+        updateAnswerObjects();
+        beepPlayed = false;
+        currentQuestionStartTime = performance.now();
       }
       
-      // Funciones AR (sin modificaciones respecto a la versión original funcional)
       function updateQuestionPanel() {
         const canvas = document.createElement('canvas');
         canvas.width = 512 * resolutionFactor;
@@ -372,11 +270,9 @@
         let arcAngle = (numAnswers <= 4) ? minHalfArc : (numAnswers >= 10) ? maxHalfArc : minHalfArc + ((numAnswers - 4) / (10 - 4)) * (maxHalfArc - minHalfArc);
         const angleStart = -arcAngle / 2;
         const angleEnd = arcAngle / 2;
-        const answersArray = [];
         if (initialCreation) {
-          for (let i = 0; i < numAnswers; i++) {
-            answersArray.push("?");
-          }
+          originalAnswerTransforms = [];
+          answers = [];
           let transforms = [];
           for (let i = 0; i < numAnswers; i++) {
             const canvas = document.createElement('canvas');
@@ -419,10 +315,10 @@
             let wrong = Math.floor(Math.random() * 100) + 1;
             if (wrong !== correctAnswer) wrongAnswers.add(wrong);
           }
-          const combined = [correctAnswer, ...wrongAnswers];
-          combined.sort(() => Math.random() - 0.5);
+          const answersArray = [correctAnswer, ...wrongAnswers];
+          answersArray.sort(() => Math.random() - 0.5);
           for (let i = 0; i < selectedNumAnswers; i++) {
-            updateAnswerPanel(answers[i], combined[i]);
+            updateAnswerPanel(answers[i], answersArray[i]);
           }
         }
       }
@@ -452,7 +348,7 @@
         canvas.width = size;
         canvas.height = size;
         const ctx = canvas.getContext('2d');
-        const gradient = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+        const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
         gradient.addColorStop(0, 'rgba(255,255,255,1)');
         gradient.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = gradient;
@@ -491,7 +387,7 @@
           points,
           velocities,
           startTime: performance.now(),
-          lastUpdate: performance.now(),
+          lastUpdate: performance.now()
         });
       }
       
@@ -557,12 +453,6 @@
         countdownCtx.textBaseline = "middle";
         countdownCtx.fillText(seconds < 10 ? "00:0" + seconds : "00:" + seconds, countdownCanvas.width / 2, countdownCanvas.height / 2);
         countdownTexture.needsUpdate = true;
-        if (remaining <= 10 && !beepPlayed) {
-          const beepSound = document.getElementById('beepSound');
-          beepSound.currentTime = 0;
-          beepSound.play().catch(e => console.error(e));
-          beepPlayed = true;
-        }
         return remaining;
       }
       
@@ -582,12 +472,14 @@
       
       function render(timestamp, xrFrame) {
         renderer.render(scene, camera);
+        
         answers.forEach((mesh, index) => {
           if (originalAnswerTransforms && originalAnswerTransforms[index]) {
             const baseY = originalAnswerTransforms[index].position.y;
             mesh.position.y = baseY + 0.02 * Math.sin(timestamp * 0.005 + index);
           }
         });
+        
         if (gameReady && !countdownStarted) {
           startCountdown();
           const timerSound = document.getElementById('timerSound');
@@ -595,6 +487,7 @@
           timerSound.play().catch(e => console.error(e));
           countdownStarted = true;
         }
+        
         const now = performance.now();
         for (let i = sparksSystems.length - 1; i >= 0; i--) {
           const sys = sparksSystems[i];
@@ -618,6 +511,7 @@
             sparksSystems.splice(i, 1);
           }
         }
+        
         if (!gameOver) {
           const remaining = updateCountdown();
           updateScoreDisplay();
@@ -625,6 +519,7 @@
             endGame();
           }
         }
+        
         const session = renderer.xr.getSession();
         let interactionPoints = [];
         if (session && xrFrame) {
@@ -649,6 +544,7 @@
           camera.getWorldPosition(cameraPos);
           interactionPoints.push(cameraPos);
         }
+        
         if (!gameOver) {
           for (let panel of answers) {
             const panelPos = new THREE.Vector3();
@@ -854,7 +750,7 @@
         scrollDownButtonMesh.position.set(-planeWidth * 0.5 - 0.1, -planeHeight * 0.35, -1.1);
       }
       
-      /***** MODO HTML (fallback) *****/
+      /***** MODO HTML (fallback para dispositivos sin AR) *****/
       function initHTML() {
         const gameContainer = document.createElement('div');
         gameContainer.id = 'gameContainer';
@@ -1104,13 +1000,62 @@
         });
       }, { once: true });
       
-      /***** INICIALIZACIÓN: iniciar AR o HTML según soporte *****/
-      function initARorHTML() {
-        initAR();
-        animate();
-      }
-      
-      initARorHTML();
+      /***** Iniciar AR o, si no se soporta, mostrar fallback HTML *****/
+      window.addEventListener('DOMContentLoaded', async () => {
+        // Comprobar soporte AR
+        let arSupported = false;
+        if (navigator.xr) {
+          try {
+            arSupported = await navigator.xr.isSessionSupported('immersive-ar');
+          } catch (e) {
+            arSupported = false;
+          }
+        }
+        if (arSupported) {
+          initAR();
+          animate();
+        } else {
+          // Si AR no es soportado, se muestra el botón en el overlay para iniciar HTML
+          const overlay = document.createElement('div');
+          overlay.id = 'overlay';
+          overlay.innerHTML = `
+            <img src="ARM2.jpeg" alt="AR Multimusic">
+            <a href="https://www.youtube.com/@rafgim" target="_blank">© By Rafael Gimeno</a>
+            <div class="respuestas-container">
+              <label for="numAnswers">Respuestas:</label>
+              <select id="numAnswers">
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+              </select>
+            </div>
+            <div id="leaderboardPreview"></div>
+            <input type="text" id="playerName" placeholder="Ingresa tu nombre" maxlength="10">
+          `;
+          document.body.appendChild(overlay);
+          document.getElementById('numAnswers').addEventListener('change', () => {
+            const num = parseInt(document.getElementById('numAnswers').value) || 4;
+            updateLeaderboardPreview(num);
+          });
+          updateLeaderboardPreview(4);
+          const startBtn = document.createElement('button');
+          startBtn.style.fontSize = '16px';
+          startBtn.style.padding = '10px 20px';
+          startBtn.style.marginTop = '20px';
+          startBtn.innerText = "AR no compatible, Iniciar Juego HTML";
+          startBtn.onclick = () => {
+            selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
+            playerName = document.getElementById('playerName').value.trim() || "Jugador";
+            overlay.remove();
+            initHTML();
+          };
+          overlay.appendChild(startBtn);
+        }
+      });
     </script>
   </body>
 </html>
