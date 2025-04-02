@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>AR MULTIMUSIC / HTML CALCULATION</title>
+  <title>AR MULTICÁLCULO / HTML CALCULATION</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <style>
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
@@ -582,12 +582,12 @@
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Render: se ha modificado para incluir detección continua de colisiones usando hand tracking.
+    // Render: se incorpora detección continua de colisiones usando hand tracking
     // ────────────────────────────────────────────────────────────────
     function render(timestamp, xrFrame) {
       renderer.render(scene, camera);
       
-      // Animación: oscilar los paneles
+      // Animación de los paneles (oscillación vertical)
       answers.forEach((mesh, index) => {
         if(originalAnswerTransforms && originalAnswerTransforms[index]){
           const baseY = originalAnswerTransforms[index].position.y;
@@ -595,27 +595,37 @@
         }
       });
       
+      if(gameReady && !countdownStarted){
+        startCountdown();
+        const timerSound = document.getElementById('timerSound');
+        timerSound.loop = false;
+        timerSound.play().catch(e=>console.error(e));
+        countdownStarted = true;
+      }
+      
       // Actualizar temporizador y score
-      if (!gameOver) {
+      if(!gameOver){
         const remaining = updateCountdown();
         updateScoreDisplay();
-        if (remaining <= 0) {
+        if(remaining <= 0){
           endGame();
-          return;
         }
       }
       
-      // ★ DETECCIÓN CONTINUA CON HAND TRACKING ★
-      const session = renderer.xr.getSession();
-      let handInteractionPoints = [];
-      if (session && xrFrame) {
+      // ──────────────────────────────────────────────
+      // BLOQUE NUEVO: Detección continua de colisiones con hand tracking
+      // ──────────────────────────────────────────────
+      if(xrFrame) {
+        const session = renderer.xr.getSession();
+        let interactionPoints = [];
+        // Recorremos las fuentes de entrada y si tienen hand tracking, obtenemos el joint "index-finger-tip"
         for (const inputSource of session.inputSources) {
           if (inputSource.hand) {
             const indexTip = inputSource.hand.get('index-finger-tip');
             if (indexTip) {
               const jointPose = xrFrame.getJointPose(indexTip, renderer.xr.getReferenceSpace());
               if (jointPose) {
-                handInteractionPoints.push(new THREE.Vector3(
+                interactionPoints.push(new THREE.Vector3(
                   jointPose.transform.position.x,
                   jointPose.transform.position.y,
                   jointPose.transform.position.z
@@ -624,56 +634,143 @@
             }
           }
         }
-      }
-      
-      // Verificar colisiones con los paneles
-      if (handInteractionPoints.length > 0 && !gameOver) {
-        for (let panel of answers) {
-          const panelPos = new THREE.Vector3();
-          panel.getWorldPosition(panelPos);
-          for (const point of handInteractionPoints) {
-            const distance = point.distanceTo(panelPos);
-            if (distance < collisionThreshold && !hasCollided) {
-              hasCollided = true;
-              if (panel.userData.answer === correctAnswer) {
-                const responseTime = performance.now() - currentQuestionStartTime;
-                correctResponseTimes.push(responseTime);
-                correctCount++;
-                const successSound = document.getElementById('successSound');
-                const clone = successSound.cloneNode();
-                clone.play().catch(e => {});
-                createSparksEffect(panel.position);
-                if (questionMesh) questionMesh.visible = false;
-                answers.forEach(a => a.visible = false);
-                setTimeout(() => {
-                  if (!gameOver) {
-                    generateQuestion();
-                    if (questionMesh) questionMesh.visible = true;
-                    answers.forEach(a => a.visible = true);
-                  }
-                  hasCollided = false;
-                }, 1000);
-              } else {
-                wrongCount++;
-                const errorSound = document.getElementById('errorSound');
-                const errClone = errorSound.cloneNode();
-                errClone.play().catch(e => {});
-                panel.material.color.set(0xff0000);
-                setTimeout(() => {
-                  panel.material.color.set(0xffffff);
-                  hasCollided = false;
-                }, 500);
+        // Si no se detecta ninguna mano, se usa la posición de la cámara como fallback
+        if(interactionPoints.length === 0) {
+          let cameraPos = new THREE.Vector3();
+          camera.getWorldPosition(cameraPos);
+          interactionPoints.push(cameraPos);
+        }
+        
+        // Verificamos colisiones entre cada punto de interacción y cada panel
+        if(!gameOver && !hasCollided) {
+          for(let panel of answers){
+            const panelPos = new THREE.Vector3();
+            panel.getWorldPosition(panelPos);
+            for(const point of interactionPoints) {
+              const distance = point.distanceTo(panelPos);
+              if(distance < collisionThreshold) {
+                hasCollided = true;
+                // Si la respuesta es correcta
+                if(panel.userData.answer === correctAnswer) {
+                  const responseTime = performance.now() - currentQuestionStartTime;
+                  correctResponseTimes.push(responseTime);
+                  correctCount++;
+                  const successSound = document.getElementById('successSound');
+                  const clone = successSound.cloneNode();
+                  clone.play().catch(e=>{});
+                  createSparksEffect(panel.position);
+                  if(questionMesh) questionMesh.visible = false;
+                  answers.forEach(a => a.visible = false);
+                  setTimeout(()=>{
+                    if(!gameOver){
+                      generateQuestion();
+                      if(questionMesh) questionMesh.visible = true;
+                      answers.forEach(a => a.visible = true);
+                    }
+                    hasCollided = false;
+                  }, 1000);
+                } else { // Respuesta incorrecta
+                  wrongCount++;
+                  const errorSound = document.getElementById('errorSound');
+                  const errClone = errorSound.cloneNode();
+                  errClone.play().catch(e=>{});
+                  panel.material.color.set(0xff0000);
+                  setTimeout(()=>{
+                    panel.material.color.set(0xffffff);
+                    hasCollided = false;
+                  }, 500);
+                }
+                break;
               }
-              // Salir para evitar múltiples colisiones en el mismo frame
-              return;
             }
+            if(hasCollided) break;
           }
         }
       }
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Función para reiniciar la partida en AR
+    // Manejador de eventos "select" (para controladores) – se mantiene para fallback
+    // ────────────────────────────────────────────────────────────────
+    function onSelect(event) {
+      const frame = event.frame;
+      const referenceSpace = renderer.xr.getReferenceSpace();
+      const inputSource = event.inputSource;
+      let rayOrigin, rayDirection;
+      
+      if(inputSource.hand) {
+        const indexTip = inputSource.hand.get('index-finger-tip');
+        const wrist = inputSource.hand.get('wrist');
+        if(indexTip && wrist) {
+          const indexTipPose = frame.getJointPose(indexTip, referenceSpace);
+          const wristPose = frame.getJointPose(wrist, referenceSpace);
+          if(indexTipPose && wristPose) {
+            rayOrigin = new THREE.Vector3(
+              wristPose.transform.position.x,
+              wristPose.transform.position.y,
+              wristPose.transform.position.z
+            );
+            const tipPosition = new THREE.Vector3(
+              indexTipPose.transform.position.x,
+              indexTipPose.transform.position.y,
+              indexTipPose.transform.position.z
+            );
+            rayDirection = new THREE.Vector3().subVectors(tipPosition, rayOrigin).normalize();
+          }
+        }
+      } else if(inputSource.targetRaySpace) {
+        const pose = frame.getPose(inputSource.targetRaySpace, referenceSpace);
+        if(pose){
+          const matrix = new THREE.Matrix4().fromArray(pose.transform.matrix);
+          rayOrigin = new THREE.Vector3();
+          const quaternion = new THREE.Quaternion();
+          const scale = new THREE.Vector3();
+          matrix.decompose(rayOrigin, quaternion, scale);
+          rayDirection = new THREE.Vector3(0,0,-1).applyQuaternion(quaternion).normalize();
+        }
+      }
+      
+      if(rayOrigin && rayDirection) {
+        const raycaster = new THREE.Raycaster(rayOrigin, rayDirection);
+        const intersects = raycaster.intersectObjects(answers, false);
+        if(intersects.length > 0 && !hasCollided) {
+          hasCollided = true;
+          const panel = intersects[0].object;
+          if(panel.userData.answer === correctAnswer){
+            const responseTime = performance.now() - currentQuestionStartTime;
+            correctResponseTimes.push(responseTime);
+            correctCount++;
+            const successSound = document.getElementById('successSound');
+            const clone = successSound.cloneNode();
+            clone.play().catch(e=>{});
+            createSparksEffect(panel.position);
+            if(questionMesh) questionMesh.visible = false;
+            answers.forEach(a => a.visible = false);
+            setTimeout(()=>{
+              if(!gameOver){
+                generateQuestion();
+                if(questionMesh) questionMesh.visible = true;
+                answers.forEach(a => a.visible = true);
+              }
+              hasCollided = false;
+            }, 1000);
+          } else {
+            wrongCount++;
+            const errorSound = document.getElementById('errorSound');
+            const errClone = errorSound.cloneNode();
+            errClone.play().catch(e=>{});
+            panel.material.color.set(0xff0000);
+            setTimeout(()=>{
+              panel.material.color.set(0xffffff);
+              hasCollided = false;
+            },500);
+          }
+        }
+      }
+    }
+    
+    // ────────────────────────────────────────────────────────────────
+    // Función restartGame para reiniciar la partida en AR
     // ────────────────────────────────────────────────────────────────
     function restartGame() {
       if(leaderboardMesh){
@@ -711,7 +808,7 @@
       const timerSound = document.getElementById('timerSound');
       timerSound.currentTime = 0;
       timerSound.loop = false;
-      timerSound.play().catch(e => console.error(e));
+      timerSound.play().catch(e=>console.error(e));
     }
     
     async function endGame() {
@@ -1125,9 +1222,7 @@
       });
     }, { once: true });
     
-    // ────────────────────────────────────────────────────────────────
     // Iniciar AR (o HTML) según soporte
-    // ────────────────────────────────────────────────────────────────
     function initAR() {
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
@@ -1218,88 +1313,10 @@
           createScoreDisplay();
           gameReady = true;
           gameStartTime = performance.now();
-          // Agregar listener "select" para controladores (si se usan), aunque la detección por hand tracking se maneja en el render loop
+          // Agregar listener "select" para controladores como fallback
           renderer.xr.getSession().addEventListener('select', onSelect);
         });
       })();
-    }
-    
-    // Listener para controladores (fallback si se utiliza mando)
-    function onSelect(event) {
-      const frame = event.frame;
-      const referenceSpace = renderer.xr.getReferenceSpace();
-      const inputSource = event.inputSource;
-      let rayOrigin, rayDirection;
-      
-      if (inputSource.hand) {
-        const indexTip = inputSource.hand.get('index-finger-tip');
-        const wrist = inputSource.hand.get('wrist');
-        if (indexTip && wrist) {
-          const indexTipPose = frame.getJointPose(indexTip, referenceSpace);
-          const wristPose = frame.getJointPose(wrist, referenceSpace);
-          if (indexTipPose && wristPose) {
-            rayOrigin = new THREE.Vector3(
-              wristPose.transform.position.x,
-              wristPose.transform.position.y,
-              wristPose.transform.position.z
-            );
-            const tipPosition = new THREE.Vector3(
-              indexTipPose.transform.position.x,
-              indexTipPose.transform.position.y,
-              indexTipPose.transform.position.z
-            );
-            rayDirection = new THREE.Vector3().subVectors(tipPosition, rayOrigin).normalize();
-          }
-        }
-      } else if (inputSource.targetRaySpace) {
-        const pose = frame.getPose(inputSource.targetRaySpace, referenceSpace);
-        if (pose) {
-          const matrix = new THREE.Matrix4().fromArray(pose.transform.matrix);
-          rayOrigin = new THREE.Vector3();
-          const quaternion = new THREE.Quaternion();
-          const scale = new THREE.Vector3();
-          matrix.decompose(rayOrigin, quaternion, scale);
-          rayDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion).normalize();
-        }
-      }
-      
-      if (rayOrigin && rayDirection) {
-        const raycaster = new THREE.Raycaster(rayOrigin, rayDirection);
-        const intersects = raycaster.intersectObjects(answers, false);
-        if(intersects.length > 0 && !hasCollided) {
-          hasCollided = true;
-          const panel = intersects[0].object;
-          if(panel.userData.answer === correctAnswer){
-            const responseTime = performance.now() - currentQuestionStartTime;
-            correctResponseTimes.push(responseTime);
-            correctCount++;
-            const successSound = document.getElementById('successSound');
-            const clone = successSound.cloneNode();
-            clone.play().catch(e=>{});
-            createSparksEffect(panel.position);
-            if(questionMesh) questionMesh.visible = false;
-            answers.forEach(a => a.visible = false);
-            setTimeout(()=>{
-              if(!gameOver){
-                generateQuestion();
-                if(questionMesh) questionMesh.visible = true;
-                answers.forEach(a => a.visible = true);
-              }
-              hasCollided = false;
-            }, 1000);
-          } else {
-            wrongCount++;
-            const errorSound = document.getElementById('errorSound');
-            const errClone = errorSound.cloneNode();
-            errClone.play().catch(e=>{});
-            panel.material.color.set(0xff0000);
-            setTimeout(()=>{
-              panel.material.color.set(0xffffff);
-              hasCollided = false;
-            },500);
-          }
-        }
-      }
     }
     
     initAR();
