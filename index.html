@@ -847,9 +847,7 @@
       scrollDownButtonMesh.position.set(-planeWidth*0.5 - 0.1, -planeHeight*0.35, -1.1);
     }
     
-    // ────────────────────────────────────────────────────────────────
-    // MODO HTML (fallback para dispositivos sin AR)
-    // ────────────────────────────────────────────────────────────────
+    /***** 3) MODO HTML (fallback para dispositivos sin AR) *****/
     function initHTML() {
       const gameContainer = document.createElement('div');
       gameContainer.id = 'gameContainer';
@@ -1124,7 +1122,7 @@
       
       window.addEventListener('resize', onWindowResize, false);
       
-      // Declaramos overlay como variable para usarla en el callback de sesión
+      // Declaramos el overlay como variable para poder retirarlo cuando inicie la sesión AR
       let overlay = document.createElement('div');
       overlay.id = 'overlay';
       overlay.innerHTML =
@@ -1164,6 +1162,10 @@
           arButton.style.fontSize = '16px';
           arButton.style.backgroundColor = 'green';
           arButton.style.color = 'white';
+          // Al pulsar el botón AR, retiramos el overlay para que se vea el canvas
+          arButton.addEventListener('click', () => {
+            overlay.remove();
+          });
           overlay.appendChild(arButton);
         } else {
           const startBtn = document.createElement('button');
@@ -1174,7 +1176,6 @@
           startBtn.onclick = () => {
             selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
             playerName = document.getElementById('playerName').value.trim() || "Jugador";
-            // En modo HTML, ocultamos el canvas de AR
             renderer.domElement.style.display = 'none';
             overlay.remove();
             initHTML();
@@ -1193,7 +1194,8 @@
           const inputName = document.getElementById('playerName').value;
           playerName = (inputName !== "") ? inputName : "Jugador";
           createAnswerObjects(selectedNumAnswers, true);
-          overlay.remove();
+          // En sesión AR, retiramos el overlay (si aún no se ha retirado)
+          if(overlay.parentNode) overlay.remove();
           generateQuestion();
           createScoreDisplay();
           gameReady = true;
