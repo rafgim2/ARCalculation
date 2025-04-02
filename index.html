@@ -581,21 +581,25 @@
       renderer.setAnimationLoop(render);
     }
     
-    // Función onSelect actualizada para hand tracking
+    /* 
+      Función onSelect actualizada:
+      - Si inputSource.hand existe (hand tracking), se utiliza directamente la pose del "index-finger-tip".
+      - En caso contrario, se usa inputSource.targetRaySpace.
+    */
     function onSelect(event) {
       const frame = event.frame;
       const referenceSpace = renderer.xr.getReferenceSpace();
       const inputSource = event.inputSource;
       
-      // Intentar obtener la pose a partir de targetRaySpace (para controladores)
-      let pose = frame.getPose(inputSource.targetRaySpace, referenceSpace);
-      
-      // Si no se obtiene y se está usando hand tracking, usar la punta del dedo índice
-      if (!pose && inputSource.hand) {
+      let pose;
+      // Si se detecta hand tracking, usar el dedo índice
+      if (inputSource.hand) {
         const indexTip = inputSource.hand.get('index-finger-tip');
         if (indexTip) {
           pose = frame.getJointPose(indexTip, referenceSpace);
         }
+      } else {
+        pose = frame.getPose(inputSource.targetRaySpace, referenceSpace);
       }
       
       if(pose) {
@@ -713,8 +717,6 @@
         }
       }
     }
-    
-    // Manejador del evento "select" para el modo táctil en AR (se usa la función onSelect anterior)
     
     // Función restartGame para reiniciar la partida en AR
     function restartGame() {
