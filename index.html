@@ -582,7 +582,7 @@
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Render: se actualizan paneles, chispas y se detecta colisión usando hand tracking
+    // Render: se actualizan paneles, chispas y se detecta colisión (respuestas y botones finales)
     // ────────────────────────────────────────────────────────────────
     function render(timestamp, xrFrame) {
       renderer.render(scene, camera);
@@ -638,7 +638,7 @@
       }
       
       // ───────────────────────────────
-      // BLOQUE NUEVO: Detección continua de colisiones con hand tracking
+      // Detección continua de colisiones con hand tracking o controlador
       if(xrFrame) {
         const session = renderer.xr.getSession();
         let interactionPoints = [];
@@ -663,6 +663,7 @@
           interactionPoints.push(cameraPos);
         }
         
+        // Si el juego aún está en curso, detectar colisiones con las respuestas
         if(!gameOver && !hasCollided) {
           for(let panel of answers){
             const panelPos = new THREE.Vector3();
@@ -706,12 +707,52 @@
             if(hasCollided) break;
           }
         }
+        // Si el juego ha terminado, detectar colisiones con los botones finales
+        else if(gameOver && !hasCollided) {
+          let finalButtons = [];
+          if(restartButtonMesh) finalButtons.push(restartButtonMesh);
+          if(scrollUpButtonMesh) finalButtons.push(scrollUpButtonMesh);
+          if(scrollDownButtonMesh) finalButtons.push(scrollDownButtonMesh);
+          for (let btn of finalButtons) {
+            if(!btn.visible) continue;
+            let btnPos = new THREE.Vector3();
+            btn.getWorldPosition(btnPos);
+            for(const point of interactionPoints) {
+              const distance = point.distanceTo(btnPos);
+              if(distance < collisionThreshold) {
+                hasCollided = true;
+                if(btn === restartButtonMesh) {
+                  const successSound = document.getElementById('successSound');
+                  const clone = successSound.cloneNode();
+                  clone.play().catch(e=>{});
+                  createSparksEffect(btn.position);
+                  btn.visible = false;
+                  setTimeout(() => {
+                    restartGame();
+                    hasCollided = false;
+                  }, 2000);
+                  break;
+                } else if(btn === scrollUpButtonMesh) {
+                  scoreboardStartIndex = Math.max(0, scoreboardStartIndex - 1);
+                  drawLeaderboardSegment();
+                  setTimeout(()=> { hasCollided = false; }, 500);
+                  break;
+                } else if(btn === scrollDownButtonMesh) {
+                  scoreboardStartIndex = scoreboardStartIndex + 1;
+                  drawLeaderboardSegment();
+                  setTimeout(()=> { hasCollided = false; }, 500);
+                  break;
+                }
+              }
+            }
+            if(hasCollided) break;
+          }
+        }
       }
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Manejador de eventos "select" (para controladores y también para los botones finales)
-    // ────────────────────────────────────────────────────────────────
+    // Manejador de eventos "select" para controladores (fallback)
     function onSelect(event) {
       const frame = event.frame;
       const referenceSpace = renderer.xr.getReferenceSpace();
@@ -752,15 +793,14 @@
       
       if(rayOrigin && rayDirection) {
         const raycaster = new THREE.Raycaster(rayOrigin, rayDirection);
-        
         // Si el juego ha terminado, comprobamos botones finales
         if(gameOver) {
           const restartIntersects = raycaster.intersectObject(restartButtonMesh, false);
           if(restartIntersects.length > 0 && !hasCollided) {
             hasCollided = true;
             const successSound = document.getElementById('successSound');
-            const successClone = successSound.cloneNode();
-            successClone.play().catch(e=>{});
+            const clone = successSound.cloneNode();
+            clone.play().catch(e=>{});
             createSparksEffect(restartButtonMesh.position);
             restartButtonMesh.visible = false;
             setTimeout(() => {
@@ -786,7 +826,6 @@
             return;
           }
         }
-        
         // Si el juego está en curso, comprobamos las respuestas
         const intersects = raycaster.intersectObjects(answers, false);
         if(intersects.length > 0 && !hasCollided) {
@@ -826,7 +865,7 @@
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Función restartGame para reiniciar la partida en AR
+    // Función restartGame: elimina botones, reinicia variables, crea nuevas preguntas, reinicia timer y reproduce la música
     // ────────────────────────────────────────────────────────────────
     function restartGame() {
       if(leaderboardMesh){
