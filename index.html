@@ -179,11 +179,9 @@
     
     /***** 2) AR y lógica del juego (modo CALCULATION) *****/
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.138.0/build/three.module.js';
-    // Detectar si se está en móvil y si se trata de un dispositivo Oculus (Quest)
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    const isQuest = /Oculus/i.test(navigator.userAgent);
-    // Si es Quest, habilitamos el hand-tracking
-    const requiredFeatures = isQuest ? ['hit-test', 'hand-tracking'] : (isMobile ? ['hit-test'] : ['hit-test','hand-tracking']);
+    // Para que Quest 3 utilice hand tracking, solicitamos "hit-test" como requerido y "hand-tracking" como opcional
+    const requiredFeatures = ['hit-test'];
+    const optionalFeatures = ['hand-tracking'];
     
     import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.138.0/examples/jsm/webxr/ARButton.js';
     
@@ -597,8 +595,9 @@
       
       if(gameReady && !countdownStarted){
         startCountdown();
-        // Reproducir el temporizador (timer7) al inicio
+        // Reproducir el temporizador (timer7) al inicio y también al reiniciar
         const timerSound = document.getElementById('timerSound');
+        timerSound.currentTime = 0;
         timerSound.loop = false;
         timerSound.play().catch(e=>console.error(e));
         countdownStarted = true;
@@ -1172,6 +1171,7 @@
       // ClearColor con alfa 0 para fondo transparente en AR
       renderer.setClearColor( 0x000000, 0 );
       renderer.xr.enabled = true;
+      // Pasamos ambas opciones: requiredFeatures y optionalFeatures
       renderer.xr.setReferenceSpaceType('local');
       document.body.appendChild(renderer.domElement);
       
@@ -1212,7 +1212,8 @@
           }
         }
         if(arSupported){
-          const arButton = ARButton.createButton(renderer, { requiredFeatures });
+          // Pasamos ahora { requiredFeatures, optionalFeatures } para habilitar hand-tracking
+          const arButton = ARButton.createButton(renderer, { requiredFeatures, optionalFeatures });
           arButton.style.position = 'absolute';
           arButton.style.top = '600px';
           arButton.style.left = 'calc(50% - 75px)';
