@@ -716,6 +716,50 @@
       }
     }
     
+    // ────────────────────────────────────────────────────────────────
+    // Manejador del evento "select" para modo táctil en AR
+    // ────────────────────────────────────────────────────────────────
+    function onSelect(event) {
+      // Usamos el centro de la pantalla para el raycast
+      const mouse = new THREE.Vector2(0, 0);
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(answers, false);
+      if(intersects.length > 0 && !hasCollided) {
+        hasCollided = true;
+        const panel = intersects[0].object;
+        if(panel.userData.answer === correctAnswer){
+          const responseTime = performance.now() - currentQuestionStartTime;
+          correctResponseTimes.push(responseTime);
+          correctCount++;
+          const successSound = document.getElementById('successSound');
+          const clone = successSound.cloneNode();
+          clone.play().catch(e=>{});
+          createSparksEffect(panel.position);
+          if(questionMesh) questionMesh.visible = false;
+          answers.forEach(a => a.visible = false);
+          setTimeout(()=>{
+            if(!gameOver){
+              generateQuestion();
+              if(questionMesh) questionMesh.visible = true;
+              answers.forEach(a => a.visible = true);
+            }
+            hasCollided = false;
+          }, 1000);
+        } else {
+          wrongCount++;
+          const errorSound = document.getElementById('errorSound');
+          const errClone = errorSound.cloneNode();
+          errClone.play().catch(e=>{});
+          panel.material.color.set(0xff0000);
+          setTimeout(()=>{
+            panel.material.color.set(0xffffff);
+            hasCollided = false;
+          },500);
+        }
+      }
+    }
+    
     async function endGame() {
       gameOver = true;
       if(questionMesh) scene.remove(questionMesh);
@@ -1221,6 +1265,8 @@
           createScoreDisplay();
           gameReady = true;
           gameStartTime = performance.now();
+          // Agregamos el evento "select" para modo táctil
+          renderer.xr.getSession().addEventListener('select', onSelect);
         });
       })();
     }
