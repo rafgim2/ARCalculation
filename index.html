@@ -720,7 +720,6 @@
     // Manejador del evento "select" para modo táctil en AR
     // ────────────────────────────────────────────────────────────────
     function onSelect(event) {
-      // Utilizamos la pose del targetRaySpace del inputSource para calcular el rayo de interacción
       const frame = event.frame;
       const referenceSpace = renderer.xr.getReferenceSpace();
       const inputSource = event.inputSource;
@@ -731,7 +730,6 @@
         const quaternion = new THREE.Quaternion();
         const scale = new THREE.Vector3();
         matrix.decompose(origin, quaternion, scale);
-        // La dirección "forward" en XR es -Z; aplicamos la rotación obtenida
         const direction = new THREE.Vector3(0,0,-1).applyQuaternion(quaternion).normalize();
         const raycaster = new THREE.Raycaster(origin, direction);
         const intersects = raycaster.intersectObjects(answers, false);
@@ -769,6 +767,45 @@
           }
         }
       }
+    }
+    
+    // ────────────────────────────────────────────────────────────────
+    // Función restartGame para reiniciar la partida en AR
+    // ────────────────────────────────────────────────────────────────
+    function restartGame() {
+      // Eliminar de la escena leaderboard y botones
+      if(leaderboardMesh){
+        scene.remove(leaderboardMesh);
+        leaderboardMesh = null;
+      }
+      if(restartButtonMesh){
+        scene.remove(restartButtonMesh);
+        restartButtonMesh = null;
+      }
+      if(scrollUpButtonMesh){
+        scene.remove(scrollUpButtonMesh);
+        scrollUpButtonMesh = null;
+      }
+      if(scrollDownButtonMesh){
+        scene.remove(scrollDownButtonMesh);
+        scrollDownButtonMesh = null;
+      }
+      
+      // Reiniciar variables del juego
+      correctCount = 0;
+      wrongCount = 0;
+      gameOver = false;
+      correctResponseTimes = [];
+      gameStartTime = performance.now();
+      countdownStarted = false;
+      
+      // Eliminar paneles de respuesta existentes
+      answers.forEach(a => scene.remove(a));
+      answers = [];
+      
+      // Generar nueva pregunta y recrear el marcador
+      generateQuestion();
+      createScoreDisplay();
     }
     
     async function endGame() {
