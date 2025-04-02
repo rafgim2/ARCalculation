@@ -612,7 +612,6 @@
         }
       }
       
-      // ───────────────────────────────
       // Actualizar animación de las chispas
       const now = performance.now();
       for(let i = sparksSystems.length - 1; i >= 0; i--){
@@ -711,7 +710,8 @@
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Manejador de eventos "select" (para controladores) – se mantiene como fallback
+    // Manejador de eventos "select" (para controladores y también para los botones finales)
+    // ────────────────────────────────────────────────────────────────
     function onSelect(event) {
       const frame = event.frame;
       const referenceSpace = renderer.xr.getReferenceSpace();
@@ -752,6 +752,42 @@
       
       if(rayOrigin && rayDirection) {
         const raycaster = new THREE.Raycaster(rayOrigin, rayDirection);
+        
+        // Si el juego ha terminado, comprobamos botones finales
+        if(gameOver) {
+          const restartIntersects = raycaster.intersectObject(restartButtonMesh, false);
+          if(restartIntersects.length > 0 && !hasCollided) {
+            hasCollided = true;
+            const successSound = document.getElementById('successSound');
+            const successClone = successSound.cloneNode();
+            successClone.play().catch(e=>{});
+            createSparksEffect(restartButtonMesh.position);
+            restartButtonMesh.visible = false;
+            setTimeout(() => {
+              restartGame();
+              hasCollided = false;
+            }, 2000);
+            return;
+          }
+          const scrollUpIntersects = raycaster.intersectObject(scrollUpButtonMesh, false);
+          if(scrollUpIntersects.length > 0 && !hasCollided) {
+            hasCollided = true;
+            scoreboardStartIndex = Math.max(0, scoreboardStartIndex - 1);
+            drawLeaderboardSegment();
+            setTimeout(()=> { hasCollided = false; }, 500);
+            return;
+          }
+          const scrollDownIntersects = raycaster.intersectObject(scrollDownButtonMesh, false);
+          if(scrollDownIntersects.length > 0 && !hasCollided) {
+            hasCollided = true;
+            scoreboardStartIndex = scoreboardStartIndex + 1;
+            drawLeaderboardSegment();
+            setTimeout(()=> { hasCollided = false; }, 500);
+            return;
+          }
+        }
+        
+        // Si el juego está en curso, comprobamos las respuestas
         const intersects = raycaster.intersectObjects(answers, false);
         if(intersects.length > 0 && !hasCollided) {
           hasCollided = true;
