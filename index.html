@@ -409,8 +409,13 @@
       }
     }
     
+    // Si no existen paneles, se crean nuevos (initialCreation = true)
     function updateAnswerObjects() {
-      createAnswerObjects(selectedNumAnswers, false);
+      if(answers.length === 0){
+         createAnswerObjects(selectedNumAnswers, true);
+      } else {
+         createAnswerObjects(selectedNumAnswers, false);
+      }
     }
     
     function drawRoundedRect(ctx, x, y, width, height, radius) {
@@ -627,7 +632,7 @@
       }
     }
     
-    // Manejador del evento "select" para modo táctil en AR, ahora comprobando también el botón de reinicio si gameOver es true
+    // Manejador del evento "select" para modo táctil en AR, comprobando también el botón reiniciar si gameOver es true
     function onSelect(event) {
       const frame = event.frame;
       const referenceSpace = renderer.xr.getReferenceSpace();
@@ -657,7 +662,6 @@
             return;
           }
         }
-        // Si el juego no ha terminado, se verifica la interacción con los paneles de respuesta
         const intersects = raycaster.intersectObjects(answers, false);
         if(intersects.length > 0 && !hasCollided) {
           hasCollided = true;
@@ -722,10 +726,14 @@
       correctResponseTimes = [];
       gameStartTime = performance.now();
       countdownStarted = false;
+      gameReady = true;
       
       // Eliminar paneles de respuesta existentes
       answers.forEach(a => scene.remove(a));
       answers = [];
+      
+      // Crear nuevos paneles de respuesta (como si fuera la primera vez)
+      createAnswerObjects(selectedNumAnswers, true);
       
       // Generar nueva pregunta y recrear el marcador
       generateQuestion();
@@ -1235,7 +1243,7 @@
           createScoreDisplay();
           gameReady = true;
           gameStartTime = performance.now();
-          // Agregar el listener "select" para el modo táctil, que ahora comprueba también el botón reiniciar
+          // Agregar listener "select" para el modo táctil, que ahora comprueba también el botón reiniciar
           renderer.xr.getSession().addEventListener('select', onSelect);
         });
       })();
