@@ -479,7 +479,7 @@
       currentQuestionStartTime = performance.now();
     }
     
-    // Inicialización de la escena, cámara, renderer y overlay
+    // Inicialización de la escena, cámara, renderer y overlay para AR
     let initialCameraPos = new THREE.Vector3();
     let initialCameraDir = new THREE.Vector3();
     
@@ -543,7 +543,7 @@
           arButton.style.color = 'white';
           overlay.appendChild(arButton);
         } else {
-          // Si AR no es compatible, se muestra un botón para iniciar el modo HTML
+          // Si AR no es compatible, se muestra un botón para iniciar el modo HTML y se oculta el canvas de AR
           const startBtn = document.createElement('button');
           startBtn.innerText = "AR no compatible, Iniciar Juego HTML";
           startBtn.style.fontSize = '16px';
@@ -552,6 +552,11 @@
           startBtn.onclick = () => {
             selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
             playerName = document.getElementById('playerName').value.trim() || "Jugador";
+            // Ocultar el canvas de AR
+            const arCanvas = renderer.domElement;
+            if(arCanvas){
+              arCanvas.style.display = 'none';
+            }
             overlay.remove();
             initHTML();
           };
