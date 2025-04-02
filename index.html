@@ -670,55 +670,96 @@
 
     
     function render(timestamp, xrFrame) {
-      renderer.render(scene, camera);
-      
-      answers.forEach((mesh, index) => {
-        if(originalAnswerTransforms && originalAnswerTransforms[index]){
-          const baseY = originalAnswerTransforms[index].position.y;
-          mesh.position.y = baseY + 0.02 * Math.sin(timestamp * 0.005 + index);
-        }
-      });
-      
-      if(gameReady && !countdownStarted){
-        startCountdown();
-        const timerSound = document.getElementById('timerSound');
-        timerSound.loop = false;
-        timerSound.play().catch(e=>console.error(e));
-        countdownStarted = true;
-      }
-      
-      const now = performance.now();
-      for(let i = sparksSystems.length - 1; i >= 0; i--){
-        const sys = sparksSystems[i];
-        const dt = (now - sys.lastUpdate) / 1000;
-        sys.lastUpdate = now;
-        const pos = sys.points.geometry.attributes.position.array;
-        for(let j=0; j<sys.velocities.length; j++){
-          pos[j*3+0] += sys.velocities[j].x * dt;
-          pos[j*3+1] += sys.velocities[j].y * dt;
-          pos[j*3+2] += sys.velocities[j].z * dt;
-        }
-        sys.points.geometry.attributes.position.needsUpdate = true;
-        let life = now - sys.startTime;
-        if(life > 1700){
-          let fadeTime = life - 1700;
-          let fadeFactor = Math.max(0, 1 - (fadeTime/300));
-          sys.points.material.opacity = fadeFactor;
-        }
-        if(life > 2000){
-          scene.remove(sys.points);
-          sparksSystems.splice(i,1);
-        }
-      }
-      
-      if(!gameOver){
-        const remaining = updateCountdown();
-        updateScoreDisplay();
-        if(remaining <= 0){
-          endGame();
+  renderer.render(scene, camera);
+
+  // Animaciones y otras actualizaciones (por ejemplo, oscilar los paneles)
+  answers.forEach((mesh, index) => {
+    if (originalAnswerTransforms && originalAnswerTransforms[index]) {
+      const baseY = originalAnswerTransforms[index].position.y;
+      mesh.position.y = baseY + 0.02 * Math.sin(timestamp * 0.005 + index);
+    }
+  });
+
+  // Actualizar temporizador y score (como ya lo tienes)
+  if (!gameOver) {
+    const remaining = updateCountdown();
+    updateScoreDisplay();
+    if (remaining <= 0) {
+      endGame();
+      return;
+    }
+  }
+
+  // ★ NUEVA DETECCIÓN CONTINUA DE COLISIONES CON LAS MANOS ★
+  const session = renderer.xr.getSession();
+  let handInteractionPoints = [];
+  if (session && xrFrame) {
+    for (const inputSource of session.inputSources) {
+      if (inputSource.hand) {
+        const indexTip = inputSource.hand.get('index-finger-tip');
+        if (indexTip) {
+          const jointPose = xrFrame.getJointPose(indexTip, renderer.xr.getReferenceSpace());
+          if (jointPose) {
+            handInteractionPoints.push(new THREE.Vector3(
+              jointPose.transform.position.x,
+              jointPose.transform.position.y,
+              jointPose.transform.position.z
+            ));
+          }
         }
       }
     }
+  }
+
+  // Si se han detectado puntos de interacción de las manos, verificar colisiones
+  if (handInteractionPoints.length > 0 && !gameOver) {
+    for (let panel of answers) {
+      const panelPos = new THREE.Vector3();
+      panel.getWorldPosition(panelPos);
+      for (const point of handInteractionPoints) {
+        const distance = point.distanceTo(panelPos);
+        if (distance < collisionThreshold && !hasCollided) {
+          hasCollided = true;
+          // Comprobar si se ha tocado la respuesta correcta
+          if (panel.userData.answer === correctAnswer) {
+            const responseTime = performance.now() - currentQuestionStartTime;
+            correctResponseTimes.push(responseTime);
+            correctCount++;
+            const successSound = document.getElementById('successSound');
+            const clone = successSound.cloneNode();
+            clone.play().catch(e => {});
+            createSparksEffect(panel.position);
+            if (questionMesh) questionMesh.visible = false;
+            answers.forEach(a => a.visible = false);
+            setTimeout(() => {
+              if (!gameOver) {
+                generateQuestion();
+                if (questionMesh) questionMesh.visible = true;
+                answers.forEach(a => a.visible = true);
+              }
+              hasCollided = false;
+            }, 1000);
+          } else {
+            wrongCount++;
+            const errorSound = document.getElementById('errorSound');
+            const errClone = errorSound.cloneNode();
+            errClone.play().catch(e => {});
+            panel.material.color.set(0xff0000);
+            setTimeout(() => {
+              panel.material.color.set(0xffffff);
+              hasCollided = false;
+            }, 500);
+          }
+          // Salir de la detección para evitar múltiples colisiones en el mismo frame
+          return;
+        }
+      }
+    }
+  }
+  
+  // (Si quisieras seguir usando el evento "select" para controladores, puedes conservarlo, pero la detección por manos se maneja aquí)
+}
+
     
     // Función restartGame para reiniciar la partida en AR
     function restartGame() {
