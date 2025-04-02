@@ -409,7 +409,7 @@
       }
     }
     
-    // Si no existen paneles, se crean nuevos (initialCreation = true)
+    // Si no hay paneles, se crean nuevos (initialCreation = true)
     function updateAnswerObjects() {
       if(answers.length === 0){
          createAnswerObjects(selectedNumAnswers, true);
@@ -738,6 +738,12 @@
       // Generar nueva pregunta y recrear el marcador
       generateQuestion();
       createScoreDisplay();
+      
+      // Reiniciar la música del temporizador (timer7)
+      const timerSound = document.getElementById('timerSound');
+      timerSound.currentTime = 0;
+      timerSound.loop = false;
+      timerSound.play().catch(e => console.error(e));
     }
     
     async function endGame() {
@@ -1243,7 +1249,7 @@
           createScoreDisplay();
           gameReady = true;
           gameStartTime = performance.now();
-          // Agregar listener "select" para el modo táctil, que ahora comprueba también el botón reiniciar
+          // Agregar listener "select" para el modo táctil, comprobando también el botón reiniciar
           renderer.xr.getSession().addEventListener('select', onSelect);
         });
       })();
