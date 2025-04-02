@@ -582,7 +582,7 @@
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Render: se incorpora detección continua de colisiones usando hand tracking
+    // Render: se actualizan paneles, chispas y se detecta colisión usando hand tracking
     // ────────────────────────────────────────────────────────────────
     function render(timestamp, xrFrame) {
       renderer.render(scene, camera);
@@ -612,13 +612,37 @@
         }
       }
       
-      // ──────────────────────────────────────────────
+      // ───────────────────────────────
+      // Actualizar animación de las chispas
+      const now = performance.now();
+      for(let i = sparksSystems.length - 1; i >= 0; i--){
+        const sys = sparksSystems[i];
+        const dt = (now - sys.lastUpdate) / 1000;
+        sys.lastUpdate = now;
+        const pos = sys.points.geometry.attributes.position.array;
+        for(let j = 0; j < sys.velocities.length; j++){
+          pos[j*3+0] += sys.velocities[j].x * dt;
+          pos[j*3+1] += sys.velocities[j].y * dt;
+          pos[j*3+2] += sys.velocities[j].z * dt;
+        }
+        sys.points.geometry.attributes.position.needsUpdate = true;
+        let life = now - sys.startTime;
+        if(life > 1700){
+          let fadeTime = life - 1700;
+          let fadeFactor = Math.max(0, 1 - (fadeTime/300));
+          sys.points.material.opacity = fadeFactor;
+        }
+        if(life > 2000){
+          scene.remove(sys.points);
+          sparksSystems.splice(i, 1);
+        }
+      }
+      
+      // ───────────────────────────────
       // BLOQUE NUEVO: Detección continua de colisiones con hand tracking
-      // ──────────────────────────────────────────────
       if(xrFrame) {
         const session = renderer.xr.getSession();
         let interactionPoints = [];
-        // Recorremos las fuentes de entrada y si tienen hand tracking, obtenemos el joint "index-finger-tip"
         for (const inputSource of session.inputSources) {
           if (inputSource.hand) {
             const indexTip = inputSource.hand.get('index-finger-tip');
@@ -634,14 +658,12 @@
             }
           }
         }
-        // Si no se detecta ninguna mano, se usa la posición de la cámara como fallback
         if(interactionPoints.length === 0) {
           let cameraPos = new THREE.Vector3();
           camera.getWorldPosition(cameraPos);
           interactionPoints.push(cameraPos);
         }
         
-        // Verificamos colisiones entre cada punto de interacción y cada panel
         if(!gameOver && !hasCollided) {
           for(let panel of answers){
             const panelPos = new THREE.Vector3();
@@ -650,7 +672,6 @@
               const distance = point.distanceTo(panelPos);
               if(distance < collisionThreshold) {
                 hasCollided = true;
-                // Si la respuesta es correcta
                 if(panel.userData.answer === correctAnswer) {
                   const responseTime = performance.now() - currentQuestionStartTime;
                   correctResponseTimes.push(responseTime);
@@ -669,7 +690,7 @@
                     }
                     hasCollided = false;
                   }, 1000);
-                } else { // Respuesta incorrecta
+                } else {
                   wrongCount++;
                   const errorSound = document.getElementById('errorSound');
                   const errClone = errorSound.cloneNode();
@@ -690,8 +711,7 @@
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Manejador de eventos "select" (para controladores) – se mantiene para fallback
-    // ────────────────────────────────────────────────────────────────
+    // Manejador de eventos "select" (para controladores) – se mantiene como fallback
     function onSelect(event) {
       const frame = event.frame;
       const referenceSpace = renderer.xr.getReferenceSpace();
