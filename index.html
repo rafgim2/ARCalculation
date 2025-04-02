@@ -625,101 +625,9 @@
           endGame();
         }
       }
-      
-      const session = renderer.xr.getSession();
-      let interactionPoints = [];
-      if(session && xrFrame){
-        for(const inputSource of session.inputSources){
-          if(inputSource.hand){
-            const indexTip = inputSource.hand.get('index-finger-tip');
-            if(indexTip){
-              const jointPose = xrFrame.getJointPose(indexTip, renderer.xr.getReferenceSpace());
-              if(jointPose){
-                interactionPoints.push(new THREE.Vector3(
-                  jointPose.transform.position.x,
-                  jointPose.transform.position.y,
-                  jointPose.transform.position.z
-                ));
-              }
-            }
-          }
-        }
-      }
-      if(interactionPoints.length === 0){
-        let cameraPos = new THREE.Vector3();
-        camera.getWorldPosition(cameraPos);
-        interactionPoints.push(cameraPos);
-      }
-      
-      if(!gameOver){
-        for(let panel of answers){
-          const panelPos = new THREE.Vector3();
-          panel.getWorldPosition(panelPos);
-          for(const pt of interactionPoints){
-            const dist = pt.distanceTo(panelPos);
-            if(dist < collisionThreshold && !hasCollided){
-              hasCollided = true;
-              if(panel.userData.answer === correctAnswer){
-                const responseTime = performance.now() - currentQuestionStartTime;
-                correctResponseTimes.push(responseTime);
-                correctCount++;
-                const successSound = document.getElementById('successSound');
-                const clone = successSound.cloneNode();
-                clone.play().catch(e=>{});
-                createSparksEffect(panel.position);
-                if(questionMesh) questionMesh.visible = false;
-                answers.forEach(a => a.visible = false);
-                setTimeout(()=>{
-                  if(!gameOver){
-                    generateQuestion();
-                    if(questionMesh) questionMesh.visible = true;
-                    answers.forEach(a => a.visible = true);
-                  }
-                  hasCollided = false;
-                },1000);
-              } else {
-                wrongCount++;
-                const errorSound = document.getElementById('errorSound');
-                const errClone = errorSound.cloneNode();
-                errClone.play().catch(e=>{});
-                answers.forEach(a => a.material.color.set(0xff0000));
-                setTimeout(()=>{
-                  answers.forEach(a => a.material.color.set(0xffffff));
-                  hasCollided = false;
-                },500);
-              }
-              return;
-            }
-          }
-        }
-      } else {
-        if(restartButtonMesh){
-          const btnPos = new THREE.Vector3();
-          restartButtonMesh.getWorldPosition(btnPos);
-          for(const pt of interactionPoints){
-            const dist = pt.distanceTo(btnPos);
-            if(dist < collisionThreshold && !hasCollided){
-              hasCollided = true;
-              const successSound = document.getElementById('successSound');
-              const successClone = successSound.cloneNode();
-              successClone.play().catch(e=>{});
-              createSparksEffect(restartButtonMesh.position);
-              restartButtonMesh.visible = false;
-              // Se espera 2 segundos antes de reiniciar el juego
-              setTimeout(()=>{
-                restartGame();
-                hasCollided = false;
-              },2000);
-              break;
-            }
-          }
-        }
-      }
     }
     
-    // ────────────────────────────────────────────────────────────────
-    // Manejador del evento "select" para modo táctil en AR
-    // ────────────────────────────────────────────────────────────────
+    // Manejador del evento "select" para modo táctil en AR, ahora comprobando también el botón de reinicio si gameOver es true
     function onSelect(event) {
       const frame = event.frame;
       const referenceSpace = renderer.xr.getReferenceSpace();
@@ -733,6 +641,23 @@
         matrix.decompose(origin, quaternion, scale);
         const direction = new THREE.Vector3(0,0,-1).applyQuaternion(quaternion).normalize();
         const raycaster = new THREE.Raycaster(origin, direction);
+        if(gameOver && restartButtonMesh) {
+          const intersectsRestart = raycaster.intersectObject(restartButtonMesh, false);
+          if(intersectsRestart.length > 0 && !hasCollided) {
+            hasCollided = true;
+            const successSound = document.getElementById('successSound');
+            const successClone = successSound.cloneNode();
+            successClone.play().catch(e=>{});
+            createSparksEffect(restartButtonMesh.position);
+            restartButtonMesh.visible = false;
+            setTimeout(()=>{
+              restartGame();
+              hasCollided = false;
+            },2000);
+            return;
+          }
+        }
+        // Si el juego no ha terminado, se verifica la interacción con los paneles de respuesta
         const intersects = raycaster.intersectObjects(answers, false);
         if(intersects.length > 0 && !hasCollided) {
           hasCollided = true;
@@ -770,9 +695,7 @@
       }
     }
     
-    // ────────────────────────────────────────────────────────────────
     // Función restartGame para reiniciar la partida en AR
-    // ────────────────────────────────────────────────────────────────
     function restartGame() {
       // Eliminar de la escena leaderboard y botones
       if(leaderboardMesh){
@@ -896,15 +819,15 @@
       scene.add(leaderboardMesh);
       
       restartButtonMesh = createButton("Reiniciar");
-      restartButtonMesh.position.set(0, -0.8, -1.1);
+      restartButtonMesh.position.set(0, -planeHeight*0.6, -1.1);
       scene.add(restartButtonMesh);
       
       scrollUpButtonMesh = createButton("▲", 0.1, 0.1);
-      scrollUpButtonMesh.position.set(-planeWidth * 0.5 - 0.1, planeHeight * 0.35, -1.1);
+      scrollUpButtonMesh.position.set(-planeWidth*0.5 - 0.1, planeHeight*0.35, -1.1);
       scene.add(scrollUpButtonMesh);
       
       scrollDownButtonMesh = createButton("▼", 0.1, 0.1);
-      scrollDownButtonMesh.position.set(-planeWidth * 0.5 - 0.1, -planeHeight * 0.35, -1.1);
+      scrollDownButtonMesh.position.set(-planeWidth*0.5 - 0.1, -planeHeight*0.35, -1.1);
       scene.add(scrollDownButtonMesh);
     }
     
@@ -1220,16 +1143,14 @@
       });
     }, { once: true });
     
-    // ────────────────────────────────────────────────────────────────
     // Iniciar AR (o HTML) según soporte
-    // ────────────────────────────────────────────────────────────────
     function initAR() {
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
-      // IMPORTANTE: Establecer clearColor con alfa 0 para fondo transparente en AR
+      // ClearColor con alfa 0 para fondo transparente en AR
       renderer.setClearColor( 0x000000, 0 );
       renderer.xr.enabled = true;
       renderer.xr.setReferenceSpaceType('local');
@@ -1241,7 +1162,7 @@
       
       window.addEventListener('resize', onWindowResize, false);
       
-      // Declaramos overlay para usarlo en el callback de sesión
+      // Overlay de menú inicial
       let overlay = document.createElement('div');
       overlay.id = 'overlay';
       overlay.innerHTML =
@@ -1314,7 +1235,7 @@
           createScoreDisplay();
           gameReady = true;
           gameStartTime = performance.now();
-          // Agregamos el evento "select" para el modo táctil utilizando la pose del controlador
+          // Agregar el listener "select" para el modo táctil, que ahora comprueba también el botón reiniciar
           renderer.xr.getSession().addEventListener('select', onSelect);
         });
       })();
