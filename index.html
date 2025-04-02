@@ -576,149 +576,9 @@
       renderer.setAnimationLoop(render);
     }
     
-    function render(timestamp, xrFrame) {
-      renderer.render(scene, camera);
-      
-      answers.forEach((mesh, index) => {
-        if(originalAnswerTransforms && originalAnswerTransforms[index]){
-          const baseY = originalAnswerTransforms[index].position.y;
-          mesh.position.y = baseY + 0.02 * Math.sin(timestamp * 0.005 + index);
-        }
-      });
-      
-      if(gameReady && !countdownStarted){
-        startCountdown();
-        const timerSound = document.getElementById('timerSound');
-        timerSound.loop = false;
-        timerSound.play().catch(e=>console.error(e));
-        countdownStarted = true;
-      }
-      
-      const now = performance.now();
-      for(let i = sparksSystems.length - 1; i >= 0; i--){
-        const sys = sparksSystems[i];
-        const dt = (now - sys.lastUpdate) / 1000;
-        sys.lastUpdate = now;
-        const pos = sys.points.geometry.attributes.position.array;
-        for(let j=0; j<sys.velocities.length; j++){
-          pos[j*3+0] += sys.velocities[j].x * dt;
-          pos[j*3+1] += sys.velocities[j].y * dt;
-          pos[j*3+2] += sys.velocities[j].z * dt;
-        }
-        sys.points.geometry.attributes.position.needsUpdate = true;
-        let life = now - sys.startTime;
-        if(life > 1700){
-          let fadeTime = life - 1700;
-          let fadeFactor = Math.max(0, 1 - (fadeTime/300));
-          sys.points.material.opacity = fadeFactor;
-        }
-        if(life > 2000){
-          scene.remove(sys.points);
-          sparksSystems.splice(i,1);
-        }
-      }
-      
-      if(!gameOver){
-        const remaining = updateCountdown();
-        updateScoreDisplay();
-        if(remaining <= 0){
-          endGame();
-        }
-      }
-      
-      const session = renderer.xr.getSession();
-      let interactionPoints = [];
-      if(session && xrFrame){
-        for(const inputSource of session.inputSources){
-          if(inputSource.hand){
-            const indexTip = inputSource.hand.get('index-finger-tip');
-            if(indexTip){
-              const jointPose = xrFrame.getJointPose(indexTip, renderer.xr.getReferenceSpace());
-              if(jointPose){
-                interactionPoints.push(new THREE.Vector3(
-                  jointPose.transform.position.x,
-                  jointPose.transform.position.y,
-                  jointPose.transform.position.z
-                ));
-              }
-            }
-          }
-        }
-      }
-      if(interactionPoints.length === 0){
-        let cameraPos = new THREE.Vector3();
-        camera.getWorldPosition(cameraPos);
-        interactionPoints.push(cameraPos);
-      }
-      
-      if(!gameOver){
-        for(let panel of answers){
-          const panelPos = new THREE.Vector3();
-          panel.getWorldPosition(panelPos);
-          for(const pt of interactionPoints){
-            const dist = pt.distanceTo(panelPos);
-            if(dist < collisionThreshold && !hasCollided){
-              hasCollided = true;
-              if(panel.userData.answer === correctAnswer){
-                const responseTime = performance.now() - currentQuestionStartTime;
-                correctResponseTimes.push(responseTime);
-                correctCount++;
-                const successSound = document.getElementById('successSound');
-                const clone = successSound.cloneNode();
-                clone.play().catch(e=>{});
-                createSparksEffect(panel.position);
-                if(questionMesh) questionMesh.visible = false;
-                answers.forEach(a => a.visible = false);
-                setTimeout(()=>{
-                  if(!gameOver){
-                    generateQuestion();
-                    if(questionMesh) questionMesh.visible = true;
-                    answers.forEach(a => a.visible = true);
-                  }
-                  hasCollided = false;
-                },1000);
-              } else {
-                wrongCount++;
-                const errorSound = document.getElementById('errorSound');
-                const errClone = errorSound.cloneNode();
-                errClone.play().catch(e=>{});
-                answers.forEach(a => a.material.color.set(0xff0000));
-                setTimeout(()=>{
-                  answers.forEach(a => a.material.color.set(0xffffff));
-                  hasCollided = false;
-                },500);
-              }
-              return;
-            }
-          }
-        }
-      } else {
-        if(restartButtonMesh){
-          const btnPos = new THREE.Vector3();
-          restartButtonMesh.getWorldPosition(btnPos);
-          for(const pt of interactionPoints){
-            const dist = pt.distanceTo(btnPos);
-            if(dist < collisionThreshold && !hasCollided){
-              hasCollided = true;
-              const successSound = document.getElementById('successSound');
-              const successClone = successSound.cloneNode();
-              successClone.play().catch(e=>{});
-              createSparksEffect(restartButtonMesh.position);
-              restartButtonMesh.visible = false;
-              setTimeout(()=>{
-                restartGame();
-                hasCollided = false;
-              },1000);
-              break;
-            }
-          }
-        }
-      }
-    }
-    
     // ────────────────────────────────────────────────────────────────
     // Manejador del evento "select" para modo táctil en AR
-    // ────────────────────────────────────────────────────────────────
+    // Se diferencia si el juego terminó (botón reiniciar) o está en juego (selección de respuesta)
     function onSelect(event) {
       const frame = event.frame;
       const referenceSpace = renderer.xr.getReferenceSpace();
@@ -732,38 +592,61 @@
         matrix.decompose(origin, quaternion, scale);
         const direction = new THREE.Vector3(0,0,-1).applyQuaternion(quaternion).normalize();
         const raycaster = new THREE.Raycaster(origin, direction);
-        const intersects = raycaster.intersectObjects(answers, false);
-        if(intersects.length > 0 && !hasCollided) {
-          hasCollided = true;
-          const panel = intersects[0].object;
-          if(panel.userData.answer === correctAnswer){
-            const responseTime = performance.now() - currentQuestionStartTime;
-            correctResponseTimes.push(responseTime);
-            correctCount++;
+        
+        // Si el juego terminó, revisamos el botón de reinicio
+        if(gameOver && restartButtonMesh){
+          const intersectsRestart = raycaster.intersectObject(restartButtonMesh, false);
+          if(intersectsRestart.length > 0 && !hasCollided){
+            hasCollided = true;
             const successSound = document.getElementById('successSound');
-            const clone = successSound.cloneNode();
-            clone.play().catch(e=>{});
-            createSparksEffect(panel.position);
-            if(questionMesh) questionMesh.visible = false;
-            answers.forEach(a => a.visible = false);
+            const successClone = successSound.cloneNode();
+            successClone.play().catch(e=>{});
+            createSparksEffect(restartButtonMesh.position);
+            restartButtonMesh.visible = false;
+            // Esperamos 2 segundos para reiniciar
             setTimeout(()=>{
-              if(!gameOver){
-                generateQuestion();
-                if(questionMesh) questionMesh.visible = true;
-                answers.forEach(a => a.visible = true);
-              }
+              restartGame();
               hasCollided = false;
-            }, 1000);
-          } else {
-            wrongCount++;
-            const errorSound = document.getElementById('errorSound');
-            const errClone = errorSound.cloneNode();
-            errClone.play().catch(e=>{});
-            panel.material.color.set(0xff0000);
-            setTimeout(()=>{
-              panel.material.color.set(0xffffff);
-              hasCollided = false;
-            },500);
+            },2000);
+            return;
+          }
+        }
+        
+        // Si aún no ha terminado, procesamos la selección de respuesta
+        if(!gameOver){
+          const intersects = raycaster.intersectObjects(answers, false);
+          if(intersects.length > 0 && !hasCollided) {
+            hasCollided = true;
+            const panel = intersects[0].object;
+            if(panel.userData.answer === correctAnswer){
+              const responseTime = performance.now() - currentQuestionStartTime;
+              correctResponseTimes.push(responseTime);
+              correctCount++;
+              const successSound = document.getElementById('successSound');
+              const clone = successSound.cloneNode();
+              clone.play().catch(e=>{});
+              createSparksEffect(panel.position);
+              if(questionMesh) questionMesh.visible = false;
+              answers.forEach(a => a.visible = false);
+              setTimeout(()=>{
+                if(!gameOver){
+                  generateQuestion();
+                  if(questionMesh) questionMesh.visible = true;
+                  answers.forEach(a => a.visible = true);
+                }
+                hasCollided = false;
+              },1000);
+            } else {
+              wrongCount++;
+              const errorSound = document.getElementById('errorSound');
+              const errClone = errorSound.cloneNode();
+              errClone.play().catch(e=>{});
+              panel.material.color.set(0xff0000);
+              setTimeout(()=>{
+                panel.material.color.set(0xffffff);
+                hasCollided = false;
+              },500);
+            }
           }
         }
       }
