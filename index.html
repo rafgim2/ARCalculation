@@ -268,7 +268,7 @@
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Función para actualizar el panel de respuesta (soluciona el error)
+    // Función para actualizar el panel de respuesta
     // ────────────────────────────────────────────────────────────────
     function updateAnswerPanel(mesh, answerValue) {
       const canvas = document.createElement('canvas');
@@ -292,7 +292,7 @@
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Funciones AR: generateQuestion llama a generateNewQuestion, actualiza la interfaz AR y asigna el tiempo de inicio
+    // Funciones AR: generateQuestion actualiza la interfaz AR y asigna el tiempo de inicio
     // ────────────────────────────────────────────────────────────────
     function generateQuestion() {
       generateNewQuestion();
@@ -720,42 +720,53 @@
     // Manejador del evento "select" para modo táctil en AR
     // ────────────────────────────────────────────────────────────────
     function onSelect(event) {
-      // Usamos el centro de la pantalla para el raycast
-      const mouse = new THREE.Vector2(0, 0);
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(answers, false);
-      if(intersects.length > 0 && !hasCollided) {
-        hasCollided = true;
-        const panel = intersects[0].object;
-        if(panel.userData.answer === correctAnswer){
-          const responseTime = performance.now() - currentQuestionStartTime;
-          correctResponseTimes.push(responseTime);
-          correctCount++;
-          const successSound = document.getElementById('successSound');
-          const clone = successSound.cloneNode();
-          clone.play().catch(e=>{});
-          createSparksEffect(panel.position);
-          if(questionMesh) questionMesh.visible = false;
-          answers.forEach(a => a.visible = false);
-          setTimeout(()=>{
-            if(!gameOver){
-              generateQuestion();
-              if(questionMesh) questionMesh.visible = true;
-              answers.forEach(a => a.visible = true);
-            }
-            hasCollided = false;
-          }, 1000);
-        } else {
-          wrongCount++;
-          const errorSound = document.getElementById('errorSound');
-          const errClone = errorSound.cloneNode();
-          errClone.play().catch(e=>{});
-          panel.material.color.set(0xff0000);
-          setTimeout(()=>{
-            panel.material.color.set(0xffffff);
-            hasCollided = false;
-          },500);
+      // Utilizamos la pose del targetRaySpace del inputSource para calcular el rayo de interacción
+      const frame = event.frame;
+      const referenceSpace = renderer.xr.getReferenceSpace();
+      const inputSource = event.inputSource;
+      const pose = frame.getPose(inputSource.targetRaySpace, referenceSpace);
+      if(pose){
+        const matrix = new THREE.Matrix4().fromArray(pose.transform.matrix);
+        const origin = new THREE.Vector3();
+        const quaternion = new THREE.Quaternion();
+        const scale = new THREE.Vector3();
+        matrix.decompose(origin, quaternion, scale);
+        // La dirección "forward" en XR es -Z; aplicamos la rotación obtenida
+        const direction = new THREE.Vector3(0,0,-1).applyQuaternion(quaternion).normalize();
+        const raycaster = new THREE.Raycaster(origin, direction);
+        const intersects = raycaster.intersectObjects(answers, false);
+        if(intersects.length > 0 && !hasCollided) {
+          hasCollided = true;
+          const panel = intersects[0].object;
+          if(panel.userData.answer === correctAnswer){
+            const responseTime = performance.now() - currentQuestionStartTime;
+            correctResponseTimes.push(responseTime);
+            correctCount++;
+            const successSound = document.getElementById('successSound');
+            const clone = successSound.cloneNode();
+            clone.play().catch(e=>{});
+            createSparksEffect(panel.position);
+            if(questionMesh) questionMesh.visible = false;
+            answers.forEach(a => a.visible = false);
+            setTimeout(()=>{
+              if(!gameOver){
+                generateQuestion();
+                if(questionMesh) questionMesh.visible = true;
+                answers.forEach(a => a.visible = true);
+              }
+              hasCollided = false;
+            }, 1000);
+          } else {
+            wrongCount++;
+            const errorSound = document.getElementById('errorSound');
+            const errClone = errorSound.cloneNode();
+            errClone.play().catch(e=>{});
+            panel.material.color.set(0xff0000);
+            setTimeout(()=>{
+              panel.material.color.set(0xffffff);
+              hasCollided = false;
+            },500);
+          }
         }
       }
     }
@@ -1192,7 +1203,7 @@
       
       window.addEventListener('resize', onWindowResize, false);
       
-      // Declaramos overlay como variable para usarla en el callback de sesión
+      // Declaramos overlay para usarlo en el callback de sesión
       let overlay = document.createElement('div');
       overlay.id = 'overlay';
       overlay.innerHTML =
@@ -1265,7 +1276,7 @@
           createScoreDisplay();
           gameReady = true;
           gameStartTime = performance.now();
-          // Agregamos el evento "select" para modo táctil
+          // Agregamos el evento "select" para el modo táctil utilizando la pose del controlador
           renderer.xr.getSession().addEventListener('select', onSelect);
         });
       })();
