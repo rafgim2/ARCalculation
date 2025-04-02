@@ -268,8 +268,7 @@
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Funciones AR (se mantienen sin cambios, excepto que ahora "generateQuestion"
-    // llama a generateNewQuestion() y asigna currentQuestionStartTime)
+    // Funciones AR: generateQuestion llama a generateNewQuestion, actualiza la interfaz AR y asigna el tiempo de inicio
     // ────────────────────────────────────────────────────────────────
     function generateQuestion() {
       generateNewQuestion();
@@ -283,7 +282,6 @@
       currentQuestionStartTime = performance.now();
     }
     
-    // (Las funciones updateQuestionPanel, createAnswerObjects, etc. se mantienen igual)
     function updateQuestionPanel() {
       const canvas = document.createElement('canvas');
       canvas.width = 512 * resolutionFactor;
@@ -318,104 +316,169 @@
       }
     }
     
-    // (Otras funciones AR permanecen sin cambios…)
-    // ────────────────────────────────────────────────────────────────
-    // Inicialización de AR y creación del overlay (con botón de fallback HTML)
-    function initAR() {
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      renderer.xr.setReferenceSpaceType('local');
-      document.body.appendChild(renderer.domElement);
+    function createAnswerObjects(numAnswers, initialCreation) {
+      const minHalfArc = 0.698132; // 40° en radianes
+      const maxHalfArc = Math.PI / 2; // 90°
+      let halfArc = (numAnswers <= 4) ? minHalfArc 
+                    : (numAnswers >= 10) ? maxHalfArc 
+                    : minHalfArc + ((numAnswers - 4) / (10 - 4)) * (maxHalfArc - minHalfArc);
+      const angleStart = -halfArc;
+      const angleEnd = halfArc;
+      const radius = 0.8;
       
-      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-      light.position.set(0.5,1,0.25);
-      scene.add(light);
-      
-      window.addEventListener('resize', onWindowResize, false);
-      
-      // Crear el overlay con imagen, link, selector, mini tabla e input para nombre
-      const overlay = document.createElement('div');
-      overlay.id = 'overlay';
-      overlay.innerHTML =
-        '<img src="ARCalc.jpeg" alt="ARCalculation" style="margin-bottom:30px; margin-top:50px;">' +
-        '<a href="https://www.youtube.com/@rafgim" target="_blank">© By Rafael Gimeno</a>' +
-        '<div class="respuestas-container">' +
-          '<label for="numAnswers">Respuestas:</label>' +
-          '<select id="numAnswers">' +
-            '<option value="4">4</option>' +
-            '<option value="5">5</option>' +
-            '<option value="6">6</option>' +
-            '<option value="7">7</option>' +
-            '<option value="8">8</option>' +
-            '<option value="9">9</option>' +
-            '<option value="10">10</option>' +
-          '</select>' +
-        '</div>' +
-        '<div id="leaderboardPreview"></div>' +
-        '<input type="text" id="playerName" placeholder="Ingresa tu nombre" style="padding:10px; font-size:16px; margin-bottom:20px;" maxlength="10">';
-      
-      // Comprobar soporte de AR y, en caso negativo, mostrar botón para modo HTML
-      (async () => {
-        let arSupported = false;
-        if(navigator.xr){
-          try {
-            arSupported = await navigator.xr.isSessionSupported('immersive-ar');
-          } catch(e){
-            arSupported = false;
+      if (initialCreation) {
+        originalAnswerTransforms = [];
+        answers = [];
+        for (let i = 0; i < numAnswers; i++) {
+          const canvas = document.createElement('canvas');
+          canvas.width = 256 * resolutionFactor;
+          canvas.height = 256 * resolutionFactor;
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = "#007BFF";
+          drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
+          ctx.font = 'Bold ' + (75 * resolutionFactor) + 'px Arial';
+          ctx.fillStyle = "#FFFFFF";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const wrongAnswers = new Set();
+          while(wrongAnswers.size < (numAnswers-1)) {
+            let wrong = Math.floor(Math.random()*100)+1;
+            if(wrong !== correctAnswer) wrongAnswers.add(wrong);
           }
+          const answersArray = [correctAnswer, ...wrongAnswers];
+          answersArray.sort(() => Math.random()-0.5);
+          ctx.fillText(answersArray[i], canvas.width/2, canvas.height/2);
+          const texture = new THREE.CanvasTexture(canvas);
+          texture.minFilter = THREE.LinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+          const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
+          const geometry = new THREE.PlaneGeometry(0.15, 0.15);
+          const mesh = new THREE.Mesh(geometry, material);
+          const angle = angleStart + (angleEnd - angleStart) * (i/(numAnswers-1));
+          const xOffset = radius * Math.sin(angle);
+          const zOffset = -radius * Math.cos(angle);
+          mesh.position.set(xOffset, 0, zOffset);
+          const cameraWorldPos = new THREE.Vector3();
+          camera.getWorldPosition(cameraWorldPos);
+          const lookAtPos = new THREE.Vector3(cameraWorldPos.x, mesh.position.y, cameraWorldPos.z);
+          mesh.lookAt(lookAtPos);
+          mesh.userData.answer = answersArray[i];
+          answers.push(mesh);
+          scene.add(mesh);
+          originalAnswerTransforms.push({
+            position: mesh.position.clone(),
+            rotation: mesh.rotation.clone()
+          });
         }
-        if(arSupported){
-          const arButton = ARButton.createButton(renderer, { requiredFeatures });
-          arButton.style.position = 'absolute';
-          arButton.style.top = '600px';
-          arButton.style.left = 'calc(50% - 75px)';
-          arButton.style.width = '150px';
-          arButton.style.height = '50px';
-          arButton.style.fontSize = '16px';
-          arButton.style.backgroundColor = 'green';
-          arButton.style.color = 'white';
-          overlay.appendChild(arButton);
-        } else {
-          const startBtn = document.createElement('button');
-          startBtn.innerText = "AR no compatible, Iniciar Juego HTML";
-          startBtn.style.fontSize = '16px';
-          startBtn.style.padding = '10px 20px';
-          startBtn.style.marginTop = '20px';
-          startBtn.onclick = () => {
-            selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
-            playerName = document.getElementById('playerName').value.trim() || "Jugador";
-            const arCanvas = renderer.domElement;
-            if(arCanvas){
-              arCanvas.style.display = 'none';
-            }
-            overlay.remove();
-            initHTML();
-          };
-          overlay.appendChild(startBtn);
+      } else {
+        const wrongAnswers = new Set();
+        while(wrongAnswers.size < (numAnswers-1)) {
+          let wrong = Math.floor(Math.random()*100)+1;
+          if(wrong !== correctAnswer) wrongAnswers.add(wrong);
         }
-        document.body.appendChild(overlay);
-        document.getElementById('numAnswers').addEventListener('change', () => {
-          const num = parseInt(document.getElementById('numAnswers').value) || 4;
-          updateLeaderboardPreview(num);
-        });
-        updateLeaderboardPreview(4);
-        
-        renderer.xr.addEventListener('sessionstart', () => {
-          selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
-          const inputName = document.getElementById('playerName').value;
-          playerName = (inputName !== "") ? inputName : "Jugador";
-          createAnswerObjects(selectedNumAnswers, true);
-          overlay.remove();
-          generateQuestion();
-          createScoreDisplay();
-          gameReady = true;
-          gameStartTime = performance.now();
-        });
-      })();
+        const answersArray = [correctAnswer, ...wrongAnswers];
+        answersArray.sort(() => Math.random()-0.5);
+        for(let i = 0; i < numAnswers; i++){
+          updateAnswerPanel(answers[i], answersArray[i]);
+        }
+      }
+    }
+    
+    function updateAnswerObjects() {
+      createAnswerObjects(selectedNumAnswers, false);
+    }
+    
+    function drawRoundedRect(ctx, x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+      ctx.fill();
+    }
+    
+    function createCircleTexture() {
+      const size = 128;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0,0,size,size);
+      const gradient = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+      gradient.addColorStop(0, 'rgba(255,255,255,1)');
+      gradient.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0,0,size,size);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      return texture;
+    }
+    
+    const sparkTexture = createCircleTexture();
+    
+    function createSparksEffect(position) {
+      const count = 100;
+      const positions = new Float32Array(count * 3);
+      const velocities = [];
+      for(let i = 0; i < count; i++){
+        positions[i*3] = position.x;
+        positions[i*3+1] = position.y;
+        positions[i*3+2] = position.z;
+        velocities.push(new THREE.Vector3(
+          (Math.random()-0.5)*0.5,
+          (Math.random()-0.5)*0.5,
+          (Math.random()-0.5)*0.5
+        ));
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const material = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.02,
+        map: sparkTexture,
+        transparent: true,
+        opacity: 1.0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        alphaTest: 0.5,
+        sizeAttenuation: true
+      });
+      const points = new THREE.Points(geometry, material);
+      scene.add(points);
+      sparksSystems.push({
+        points,
+        velocities,
+        startTime: performance.now(),
+        lastUpdate: performance.now()
+      });
+    }
+    
+    function createButton(text, planeWidth = 0.3, planeHeight = 0.1) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128 * resolutionFactor;
+      canvas.height = 64 * resolutionFactor;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = "#007BFF";
+      drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 10 * resolutionFactor);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = 'Bold ' + (18 * resolutionFactor) + 'px Arial';
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, canvas.width/2, canvas.height/2);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      const geom = new THREE.PlaneGeometry(planeWidth, planeHeight);
+      const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+      return new THREE.Mesh(geom, mat);
     }
     
     function onWindowResize() {
@@ -424,7 +487,6 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     }
     
-    // (Las funciones para countdown, score, render loop, detección de colisiones y restart se mantienen igual)
     function startCountdown() {
       gameStartTime = performance.now();
       countdownCanvas = document.createElement('canvas');
@@ -785,53 +847,9 @@
       scrollDownButtonMesh.position.set(-planeWidth*0.5 - 0.1, -planeHeight*0.35, -1.1);
     }
     
-    function createButton(text, planeWidth = 0.3, planeHeight = 0.1) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 128 * resolutionFactor;
-      canvas.height = 64 * resolutionFactor;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = "#007BFF";
-      drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 10 * resolutionFactor);
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = 'Bold ' + (18 * resolutionFactor) + 'px Arial';
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(text, canvas.width/2, canvas.height/2);
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      const geom = new THREE.PlaneGeometry(planeWidth, planeHeight);
-      const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
-      return new THREE.Mesh(geom, mat);
-    }
-    
-    // Reiniciar juego en AR
-    function restartGame() {
-      if(restartButtonMesh) { scene.remove(restartButtonMesh); restartButtonMesh = null; }
-      if(leaderboardMesh) { scene.remove(leaderboardMesh); leaderboardMesh = null; }
-      if(scrollUpButtonMesh) { scene.remove(scrollUpButtonMesh); scrollUpButtonMesh = null; }
-      if(scrollDownButtonMesh) { scene.remove(scrollDownButtonMesh); scrollDownButtonMesh = null; }
-      answers.forEach(panel => scene.remove(panel));
-      answers = [];
-      correctCount = 0;
-      wrongCount = 0;
-      gameStartTime = performance.now();
-      gameOver = false;
-      correctResponseTimes = [];
-      createAnswerObjects(selectedNumAnswers, true);
-      generateQuestion();
-      countdownStarted = false;
-      gameReady = true;
-      createScoreDisplay();
-      const timerSound = document.getElementById('timerSound');
-      timerSound.currentTime = 0;
-      timerSound.loop = false;
-      timerSound.play().catch(e=>console.error(e));
-    }
-    
-    /***** 3) MODO HTML (fallback para dispositivos sin AR) *****/
-    // En el modo HTML usaremos las funciones de generación de la operación definidas en generateNewQuestion()
-    // y luego actualizaremos la interfaz HTML con updateHTMLQuestion() y createHTMLAnswerButtons()
+    // ────────────────────────────────────────────────────────────────
+    // MODO HTML (fallback para dispositivos sin AR)
+    // ────────────────────────────────────────────────────────────────
     function initHTML() {
       const gameContainer = document.createElement('div');
       gameContainer.id = 'gameContainer';
@@ -893,7 +911,6 @@
       updateHTMLScore();
     }
     
-    // Ahora nextHTMLQuestion llama a generateNewQuestion() y actualiza la interfaz HTML
     function nextHTMLQuestion() {
       generateNewQuestion();
       updateHTMLQuestion();
@@ -1088,7 +1105,103 @@
       });
     }, { once: true });
     
+    // ────────────────────────────────────────────────────────────────
     // Iniciar AR (o HTML) según soporte
+    // ────────────────────────────────────────────────────────────────
+    function initAR() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      renderer.xr.setReferenceSpaceType('local');
+      document.body.appendChild(renderer.domElement);
+      
+      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+      light.position.set(0.5,1,0.25);
+      scene.add(light);
+      
+      window.addEventListener('resize', onWindowResize, false);
+      
+      // Declaramos overlay como variable para usarla en el callback de sesión
+      let overlay = document.createElement('div');
+      overlay.id = 'overlay';
+      overlay.innerHTML =
+        '<img src="ARCalc.jpeg" alt="ARCalculation" style="margin-bottom:30px; margin-top:50px;">' +
+        '<a href="https://www.youtube.com/@rafgim" target="_blank">© By Rafael Gimeno</a>' +
+        '<div class="respuestas-container">' +
+          '<label for="numAnswers">Respuestas:</label>' +
+          '<select id="numAnswers">' +
+            '<option value="4">4</option>' +
+            '<option value="5">5</option>' +
+            '<option value="6">6</option>' +
+            '<option value="7">7</option>' +
+            '<option value="8">8</option>' +
+            '<option value="9">9</option>' +
+            '<option value="10">10</option>' +
+          '</select>' +
+        '</div>' +
+        '<div id="leaderboardPreview"></div>' +
+        '<input type="text" id="playerName" placeholder="Ingresa tu nombre" style="padding:10px; font-size:16px; margin-bottom:20px;" maxlength="10">';
+      
+      (async () => {
+        let arSupported = false;
+        if(navigator.xr){
+          try {
+            arSupported = await navigator.xr.isSessionSupported('immersive-ar');
+          } catch(e){
+            arSupported = false;
+          }
+        }
+        if(arSupported){
+          const arButton = ARButton.createButton(renderer, { requiredFeatures });
+          arButton.style.position = 'absolute';
+          arButton.style.top = '600px';
+          arButton.style.left = 'calc(50% - 75px)';
+          arButton.style.width = '150px';
+          arButton.style.height = '50px';
+          arButton.style.fontSize = '16px';
+          arButton.style.backgroundColor = 'green';
+          arButton.style.color = 'white';
+          overlay.appendChild(arButton);
+        } else {
+          const startBtn = document.createElement('button');
+          startBtn.innerText = "AR no compatible, Iniciar Juego HTML";
+          startBtn.style.fontSize = '16px';
+          startBtn.style.padding = '10px 20px';
+          startBtn.style.marginTop = '20px';
+          startBtn.onclick = () => {
+            selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
+            playerName = document.getElementById('playerName').value.trim() || "Jugador";
+            // En modo HTML, ocultamos el canvas de AR
+            renderer.domElement.style.display = 'none';
+            overlay.remove();
+            initHTML();
+          };
+          overlay.appendChild(startBtn);
+        }
+        document.body.appendChild(overlay);
+        document.getElementById('numAnswers').addEventListener('change', () => {
+          const num = parseInt(document.getElementById('numAnswers').value) || 4;
+          updateLeaderboardPreview(num);
+        });
+        updateLeaderboardPreview(4);
+        
+        renderer.xr.addEventListener('sessionstart', () => {
+          selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
+          const inputName = document.getElementById('playerName').value;
+          playerName = (inputName !== "") ? inputName : "Jugador";
+          createAnswerObjects(selectedNumAnswers, true);
+          overlay.remove();
+          generateQuestion();
+          createScoreDisplay();
+          gameReady = true;
+          gameStartTime = performance.now();
+        });
+      })();
+    }
+    
     initAR();
     animate();
   </script>
