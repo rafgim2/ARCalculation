@@ -179,8 +179,8 @@
     
     /***** 2) AR y lógica del juego (modo CALCULATION) *****/
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.138.0/build/three.module.js';
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    const requiredFeatures = isMobile ? ['hit-test'] : ['hit-test', 'hand-tracking'];
+    // Forzamos que siempre se incluya hand-tracking junto con hit-test.
+    const requiredFeatures = ['hit-test', 'hand-tracking'];
     import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.138.0/examples/jsm/webxr/ARButton.js';
     
     // VARIABLES GLOBALES DE AR
