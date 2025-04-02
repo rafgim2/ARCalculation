@@ -179,8 +179,12 @@
     
     /***** 2) AR y lógica del juego (modo CALCULATION) *****/
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.138.0/build/three.module.js';
-    // Forzamos que siempre se incluya hand-tracking junto con hit-test.
-    const requiredFeatures = ['hit-test', 'hand-tracking'];
+    // Detectar si se está en móvil y si se trata de un dispositivo Oculus (Quest)
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    const isQuest = /Oculus/i.test(navigator.userAgent);
+    // Si es Quest, habilitamos el hand-tracking
+    const requiredFeatures = isQuest ? ['hit-test', 'hand-tracking'] : (isMobile ? ['hit-test'] : ['hit-test','hand-tracking']);
+    
     import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.138.0/examples/jsm/webxr/ARButton.js';
     
     // VARIABLES GLOBALES DE AR
@@ -593,6 +597,7 @@
       
       if(gameReady && !countdownStarted){
         startCountdown();
+        // Reproducir el temporizador (timer7) al inicio
         const timerSound = document.getElementById('timerSound');
         timerSound.loop = false;
         timerSound.play().catch(e=>console.error(e));
@@ -739,7 +744,7 @@
       generateQuestion();
       createScoreDisplay();
       
-      // Reiniciar la música del temporizador (timer7)
+      // Reiniciar el audio del temporizador (timer7)
       const timerSound = document.getElementById('timerSound');
       timerSound.currentTime = 0;
       timerSound.loop = false;
