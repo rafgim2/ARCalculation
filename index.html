@@ -587,85 +587,87 @@
       - En caso contrario, se usa inputSource.targetRaySpace.
     */
     function onSelect(event) {
-      const frame = event.frame;
-      const referenceSpace = renderer.xr.getReferenceSpace();
-      const inputSource = event.inputSource;
-      
-      let pose;
-      // Si se detecta hand tracking, usar el dedo índice
-      if (inputSource.hand) {
-        const indexTip = inputSource.hand.get('index-finger-tip');
-        if (indexTip) {
-          pose = frame.getJointPose(indexTip, referenceSpace);
-        }
-      } else {
-        pose = frame.getPose(inputSource.targetRaySpace, referenceSpace);
-      }
-      
-      if(pose) {
-        const matrix = new THREE.Matrix4().fromArray(pose.transform.matrix);
-        const origin = new THREE.Vector3();
-        const quaternion = new THREE.Quaternion();
-        const scale = new THREE.Vector3();
-        matrix.decompose(origin, quaternion, scale);
-        const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion).normalize();
-        const raycaster = new THREE.Raycaster(origin, direction);
-        
-        // Si el juego ha terminado, comprobamos si se ha pulsado el botón de reinicio
-        if (gameOver && restartButtonMesh) {
-          const intersectsRestart = raycaster.intersectObject(restartButtonMesh, false);
-          if (intersectsRestart.length > 0 && !hasCollided) {
-            hasCollided = true;
-            const successSound = document.getElementById('successSound');
-            const successClone = successSound.cloneNode();
-            successClone.play().catch(e => {});
-            createSparksEffect(restartButtonMesh.position);
-            restartButtonMesh.visible = false;
-            setTimeout(() => {
-              restartGame();
-              hasCollided = false;
-            }, 2000);
-            return;
-          }
-        }
-        
-        // Comprobamos si se ha pulsado alguno de los paneles de respuesta
-        const intersects = raycaster.intersectObjects(answers, false);
-        if (intersects.length > 0 && !hasCollided) {
-          hasCollided = true;
-          const panel = intersects[0].object;
-          if (panel.userData.answer === correctAnswer) {
-            const responseTime = performance.now() - currentQuestionStartTime;
-            correctResponseTimes.push(responseTime);
-            correctCount++;
-            const successSound = document.getElementById('successSound');
-            const clone = successSound.cloneNode();
-            clone.play().catch(e => {});
-            createSparksEffect(panel.position);
-            if (questionMesh) questionMesh.visible = false;
-            answers.forEach(a => a.visible = false);
-            setTimeout(() => {
-              if (!gameOver) {
-                generateQuestion();
-                if (questionMesh) questionMesh.visible = true;
-                answers.forEach(a => a.visible = true);
-              }
-              hasCollided = false;
-            }, 1000);
-          } else {
-            wrongCount++;
-            const errorSound = document.getElementById('errorSound');
-            const errClone = errorSound.cloneNode();
-            errClone.play().catch(e => {});
-            panel.material.color.set(0xff0000);
-            setTimeout(() => {
-              panel.material.color.set(0xffffff);
-              hasCollided = false;
-            }, 500);
-          }
-        }
+  const frame = event.frame;
+  const referenceSpace = renderer.xr.getReferenceSpace();
+  const inputSource = event.inputSource;
+  let rayOrigin, rayDirection;
+  
+  // Si se trata de hand tracking, calcular el rayo desde la muñeca hacia el dedo índice
+  if (inputSource.hand) {
+    const indexTip = inputSource.hand.get('index-finger-tip');
+    const wrist = inputSource.hand.get('wrist');
+    if (indexTip && wrist) {
+      const indexTipPose = frame.getJointPose(indexTip, referenceSpace);
+      const wristPose = frame.getJointPose(wrist, referenceSpace);
+      if (indexTipPose && wristPose) {
+        // Usamos la posición de la muñeca como origen
+        rayOrigin = new THREE.Vector3(
+          wristPose.transform.position.x,
+          wristPose.transform.position.y,
+          wristPose.transform.position.z
+        );
+        // Y la dirección es desde la muñeca hacia la punta del dedo índice
+        const tipPosition = new THREE.Vector3(
+          indexTipPose.transform.position.x,
+          indexTipPose.transform.position.y,
+          indexTipPose.transform.position.z
+        );
+        rayDirection = new THREE.Vector3().subVectors(tipPosition, rayOrigin).normalize();
       }
     }
+  } 
+  // Si no se usa la mano, usar targetRaySpace (por ejemplo, controlador)
+  else if (inputSource.targetRaySpace) {
+    const pose = frame.getPose(inputSource.targetRaySpace, referenceSpace);
+    if (pose) {
+      const matrix = new THREE.Matrix4().fromArray(pose.transform.matrix);
+      rayOrigin = new THREE.Vector3();
+      const quaternion = new THREE.Quaternion();
+      const scale = new THREE.Vector3();
+      matrix.decompose(rayOrigin, quaternion, scale);
+      rayDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion).normalize();
+    }
+  }
+  
+  if (rayOrigin && rayDirection) {
+    const raycaster = new THREE.Raycaster(rayOrigin, rayDirection);
+    const intersects = raycaster.intersectObjects(answers, false);
+    if (intersects.length > 0 && !hasCollided) {
+      hasCollided = true;
+      const panel = intersects[0].object;
+      if (panel.userData.answer === correctAnswer) {
+        const responseTime = performance.now() - currentQuestionStartTime;
+        correctResponseTimes.push(responseTime);
+        correctCount++;
+        const successSound = document.getElementById('successSound');
+        const clone = successSound.cloneNode();
+        clone.play().catch(e => {});
+        createSparksEffect(panel.position);
+        if (questionMesh) questionMesh.visible = false;
+        answers.forEach(a => a.visible = false);
+        setTimeout(() => {
+          if (!gameOver) {
+            generateQuestion();
+            if (questionMesh) questionMesh.visible = true;
+            answers.forEach(a => a.visible = true);
+          }
+          hasCollided = false;
+        }, 1000);
+      } else {
+        wrongCount++;
+        const errorSound = document.getElementById('errorSound');
+        const errClone = errorSound.cloneNode();
+        errClone.play().catch(e => {});
+        panel.material.color.set(0xff0000);
+        setTimeout(() => {
+          panel.material.color.set(0xffffff);
+          hasCollided = false;
+        }, 500);
+      }
+    }
+  }
+}
+
     
     function render(timestamp, xrFrame) {
       renderer.render(scene, camera);
