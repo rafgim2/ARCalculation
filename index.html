@@ -268,6 +268,30 @@
     }
     
     // ────────────────────────────────────────────────────────────────
+    // Función para actualizar el panel de respuesta (soluciona el error)
+    // ────────────────────────────────────────────────────────────────
+    function updateAnswerPanel(mesh, answerValue) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256 * resolutionFactor;
+      canvas.height = 256 * resolutionFactor;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#007BFF";
+      drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
+      ctx.font = 'Bold ' + (75 * resolutionFactor) + 'px Arial';
+      ctx.fillStyle = "#FFFFFF";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(answerValue, canvas.width/2, canvas.height/2);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      mesh.material.map = texture;
+      mesh.material.needsUpdate = true;
+      mesh.userData.answer = answerValue;
+    }
+    
+    // ────────────────────────────────────────────────────────────────
     // Funciones AR: generateQuestion llama a generateNewQuestion, actualiza la interfaz AR y asigna el tiempo de inicio
     // ────────────────────────────────────────────────────────────────
     function generateQuestion() {
