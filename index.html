@@ -98,7 +98,7 @@
       max-width: 80%;
       max-height: 120px;
       overflow-y: auto;
-      background-color: #f0f0f0;
+      background-color: #fff;
       color: #000;
       font-size: 12px;
       border: 1px solid #000;
@@ -213,7 +213,6 @@
     // Nombre del jugador y número de respuestas
     let playerName = "Jugador";
     let selectedNumAnswers = 4;
-    // Usamos originalAnswerTransforms para almacenar la orientación original SOLO la primera vez
     let originalAnswerTransforms = null;
     let beepPlayed = false;
     let gameReady = false;
@@ -226,7 +225,6 @@
     
     // ────────────────────────────────────────────────────────────────
     // Función auxiliar para generar la operación matemática (para AR y HTML)
-    // ────────────────────────────────────────────────────────────────
     function generateNewQuestion() {
       const ops = ["+", "-", "*"];
       let a, b, c, op1, op2, calcExpression, displayExpression, structure;
@@ -269,8 +267,7 @@
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Función para actualizar el panel de respuesta para AR
-    // ────────────────────────────────────────────────────────────────
+    // Función para actualizar el panel de respuesta (AR)
     function updateAnswerPanel(mesh, answerValue) {
       const canvas = document.createElement('canvas');
       canvas.width = 256 * resolutionFactor;
@@ -293,20 +290,7 @@
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Funciones AR: generateQuestion actualiza la interfaz AR y asigna el tiempo de inicio
-    // ────────────────────────────────────────────────────────────────
-    function generateQuestion() {
-      generateNewQuestion();
-      if(questionMesh){
-        scene.remove(questionMesh);
-        questionMesh = null;
-      }
-      updateQuestionPanel();
-      updateAnswerObjects();
-      beepPlayed = false;
-      currentQuestionStartTime = performance.now();
-    }
-    
+    // Función para actualizar el panel de pregunta (AR)
     function updateQuestionPanel() {
       const canvas = document.createElement('canvas');
       canvas.width = 512 * resolutionFactor;
@@ -318,18 +302,18 @@
       let fontSize = 48 * resolutionFactor;
       ctx.font = 'Bold ' + fontSize + 'px Arial';
       const maxWidth = canvas.width * 0.9;
-      while (ctx.measureText(questionText).width > maxWidth && fontSize > 12 * resolutionFactor) {
+      while(ctx.measureText(questionText).width > maxWidth && fontSize > 12 * resolutionFactor){
         fontSize -= 2 * resolutionFactor;
         ctx.font = 'Bold ' + fontSize + 'px Arial';
       }
       ctx.fillStyle = "#FFFFFF";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(questionText, canvas.width / 2, canvas.height / 2);
+      ctx.fillText(questionText, canvas.width/2, canvas.height/2);
       const texture = new THREE.CanvasTexture(canvas);
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
-      if (questionMesh) {
+      if(questionMesh){
         questionMesh.material.map = texture;
         questionMesh.material.needsUpdate = true;
       } else {
@@ -342,34 +326,31 @@
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Función para actualizar las respuestas en AR (crea paneles o actualiza los existentes)
-    // ────────────────────────────────────────────────────────────────
+    // Función para crear (o actualizar) los paneles de respuesta (AR)
     function createAnswerObjects(numAnswers, initialCreation) {
-      const minHalfArc = 0.698132; // 40° en radianes
-      const maxHalfArc = Math.PI / 2; // 90°
-      let halfArc = (numAnswers <= 4) ? minHalfArc 
-                    : (numAnswers >= 10) ? maxHalfArc 
-                    : minHalfArc + ((numAnswers - 4) / (10 - 4)) * (maxHalfArc - minHalfArc);
+      const minHalfArc = 0.698132;
+      const maxHalfArc = Math.PI/2;
+      let halfArc = (numAnswers <= 4) ? minHalfArc : (numAnswers >= 10) ? maxHalfArc : minHalfArc + ((numAnswers-4)/(10-4))*(maxHalfArc-minHalfArc);
       const angleStart = -halfArc;
       const angleEnd = halfArc;
       const radius = 0.8;
       
-      if (initialCreation) {
-        if (!originalAnswerTransforms) {
+      if(initialCreation){
+        if(!originalAnswerTransforms){
           originalAnswerTransforms = [];
           answers = [];
-          for (let i = 0; i < numAnswers; i++) {
+          for(let i=0; i<numAnswers; i++){
             const canvas = document.createElement('canvas');
             canvas.width = 256 * resolutionFactor;
             canvas.height = 256 * resolutionFactor;
             const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0,0,canvas.width,canvas.height);
             ctx.fillStyle = "#007BFF";
-            drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
-            ctx.fillStyle = "#FFFFFF";
+            drawRoundedRect(ctx, 0,0,canvas.width,canvas.height,20*resolutionFactor);
             ctx.font = 'Bold ' + (75 * resolutionFactor) + 'px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+            ctx.fillStyle = "#FFFFFF";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
             ctx.fillText("?", canvas.width/2, canvas.height/2);
             const texture = new THREE.CanvasTexture(canvas);
             texture.minFilter = THREE.LinearFilter;
@@ -377,7 +358,7 @@
             const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
             const geometry = new THREE.PlaneGeometry(0.15, 0.15);
             const mesh = new THREE.Mesh(geometry, material);
-            const angle = angleStart + (angleEnd - angleStart) * (i/(numAnswers-1));
+            const angle = angleStart + (angleEnd-angleStart)*(i/(numAnswers-1));
             const xOffset = radius * Math.sin(angle);
             const zOffset = -radius * Math.cos(angle);
             mesh.position.set(xOffset, 0, zOffset);
@@ -394,18 +375,18 @@
           }
         } else {
           answers = [];
-          for (let i = 0; i < numAnswers; i++) {
+          for(let i=0; i<numAnswers; i++){
             const canvas = document.createElement('canvas');
             canvas.width = 256 * resolutionFactor;
             canvas.height = 256 * resolutionFactor;
             const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0,0,canvas.width,canvas.height);
             ctx.fillStyle = "#007BFF";
-            drawRoundedRect(ctx, 0, 0, canvas.width, canvas.height, 20 * resolutionFactor);
+            drawRoundedRect(ctx, 0,0,canvas.width,canvas.height,20*resolutionFactor);
             ctx.font = 'Bold ' + (75 * resolutionFactor) + 'px Arial';
             ctx.fillStyle = "#FFFFFF";
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
             ctx.fillText("?", canvas.width/2, canvas.height/2);
             const texture = new THREE.CanvasTexture(canvas);
             texture.minFilter = THREE.LinearFilter;
@@ -421,13 +402,13 @@
         }
       } else {
         const wrongAnswers = new Set();
-        while(wrongAnswers.size < (selectedNumAnswers-1)){
+        while(wrongAnswers.size < (numAnswers-1)){
           let wrong = Math.floor(Math.random()*100)+1;
           if(wrong !== correctAnswer) wrongAnswers.add(wrong);
         }
         const answersArray = [correctAnswer, ...wrongAnswers];
         answersArray.sort(() => Math.random()-0.5);
-        for(let i = 0; i < selectedNumAnswers; i++){
+        for(let i=0; i<numAnswers; i++){
           updateAnswerPanel(answers[i], answersArray[i]);
         }
       }
@@ -435,15 +416,14 @@
     
     function updateAnswerObjects() {
       if(answers.length === 0){
-         createAnswerObjects(selectedNumAnswers, true);
+        createAnswerObjects(selectedNumAnswers, true);
       } else {
-         createAnswerObjects(selectedNumAnswers, false);
+        createAnswerObjects(selectedNumAnswers, false);
       }
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Función auxiliar para dibujar rectángulo redondeado (duplicado para uso local)
-    // ────────────────────────────────────────────────────────────────
+    // Funciones auxiliares: dibujo de rectángulo redondeado y creación de textura circular
     function drawRoundedRect(ctx, x, y, width, height, radius) {
       ctx.beginPath();
       ctx.moveTo(x + radius, y);
@@ -483,8 +463,8 @@
       const count = 100;
       const positions = new Float32Array(count * 3);
       const velocities = [];
-      for(let i = 0; i < count; i++){
-        positions[i*3] = position.x;
+      for(let i=0; i<count; i++){
+        positions[i*3+0] = position.x;
         positions[i*3+1] = position.y;
         positions[i*3+2] = position.z;
         velocities.push(new THREE.Vector3(
@@ -609,6 +589,7 @@
     
     function render(timestamp, xrFrame) {
       renderer.render(scene, camera);
+      
       answers.forEach((mesh, index) => {
         if(originalAnswerTransforms && originalAnswerTransforms[index]){
           const baseY = originalAnswerTransforms[index].position.y;
@@ -656,10 +637,9 @@
         }
       }
       
-      // Detección de colisiones (XR: manos o cámara)
-      const session = renderer.xr.getSession();
-      let interactionPoints = [];
-      if(session && xrFrame){
+      if(xrFrame){
+        const session = renderer.xr.getSession();
+        let interactionPoints = [];
         for(const inputSource of session.inputSources){
           if(inputSource.hand){
             const indexTip = inputSource.hand.get('index-finger-tip');
@@ -675,65 +655,89 @@
             }
           }
         }
-      }
-      if(interactionPoints.length === 0){
-        let cameraPos = new THREE.Vector3();
-        camera.getWorldPosition(cameraPos);
-        interactionPoints.push(cameraPos);
-      }
-      
-      if(!gameOver){
-        for(let panel of answers){
-          const panelPos = new THREE.Vector3();
-          panel.getWorldPosition(panelPos);
-          for(const pt of interactionPoints){
-            const dist = pt.distanceTo(panelPos);
-            if(dist < collisionThreshold && !hasCollided){
-              hasCollided = true;
-              if(panel.userData.answer === correctAnswer){
-                const responseTime = performance.now() - currentQuestionStartTime;
-                correctResponseTimes.push(responseTime);
-                correctCount++;
-                const successSound = document.getElementById('successSound');
-                const clone = successSound.cloneNode();
-                clone.play().catch(e=>console.error(e));
-                createSparksEffect(panel.position);
-                if(questionMesh) questionMesh.visible = false;
-                if(questionImageMesh) questionImageMesh.visible = false;
-                answers.forEach(a => a.visible = false);
-                setTimeout(()=>{
-                  if(!gameOver){
-                    generateQuestion();
-                    if(questionMesh) questionMesh.visible = true;
-                    if(questionImageMesh) questionImageMesh.visible = true;
-                    answers.forEach(a => a.visible = true);
-                  }
-                  hasCollided = false;
-                }, 1000);
-              } else {
-                wrongCount++;
-                const errorSound = document.getElementById('errorSound');
-                const errorClone = errorSound.cloneNode();
-                errorClone.play().catch(e=>console.error(e));
-                answers.forEach(a => a.material.color.set(0xff0000));
-                setTimeout(()=>{
-                  answers.forEach(a => a.material.color.set(0xffffff));
-                  hasCollided = false;
-                }, 500);
+        if(interactionPoints.length === 0){
+          let cameraPos = new THREE.Vector3();
+          camera.getWorldPosition(cameraPos);
+          interactionPoints.push(cameraPos);
+        }
+        
+        if(!gameOver && !hasCollided){
+          for(let panel of answers){
+            const panelPos = new THREE.Vector3();
+            panel.getWorldPosition(panelPos);
+            for(const pt of interactionPoints){
+              const dist = pt.distanceTo(panelPos);
+              if(dist < collisionThreshold){
+                hasCollided = true;
+                if(panel.userData.answer === correctAnswer){
+                  const responseTime = performance.now() - currentQuestionStartTime;
+                  correctResponseTimes.push(responseTime);
+                  correctCount++;
+                  const successSound = document.getElementById('successSound');
+                  const clone = successSound.cloneNode();
+                  clone.play().catch(e=>{});
+                  createSparksEffect(panel.position);
+                  if(questionMesh) questionMesh.visible = false;
+                  answers.forEach(a => a.visible = false);
+                  setTimeout(()=>{
+                    if(!gameOver){
+                      generateQuestion();
+                      if(questionMesh) questionMesh.visible = true;
+                      answers.forEach(a => a.visible = true);
+                    }
+                    hasCollided = false;
+                  }, 1000);
+                } else {
+                  wrongCount++;
+                  const errorSound = document.getElementById('errorSound');
+                  const errorClone = errorSound.cloneNode();
+                  errorClone.play().catch(e=>{});
+                  panel.material.color.set(0xff0000);
+                  setTimeout(()=>{
+                    panel.material.color.set(0xffffff);
+                    hasCollided = false;
+                  }, 500);
+                }
+                break;
               }
-              return;
             }
+            if(hasCollided) break;
           }
         }
       }
     }
     
     // ────────────────────────────────────────────────────────────────
-    // Función para crear y mostrar el leaderboard final en AR
+    // Función para reiniciar juego en AR
+    function restartGame() {
+      if(questionMesh){ scene.remove(questionMesh); questionMesh = null; }
+      if(countdownMesh){ scene.remove(countdownMesh); countdownMesh = null; }
+      if(scoreMesh){ scene.remove(scoreMesh); scoreMesh = null; }
+      if(leaderboardMesh){ scene.remove(leaderboardMesh); leaderboardMesh = null; }
+      if(restartButtonMesh){ scene.remove(restartButtonMesh); restartButtonMesh = null; }
+      if(scrollUpButtonMesh){ scene.remove(scrollUpButtonMesh); scrollUpButtonMesh = null; }
+      if(scrollDownButtonMesh){ scene.remove(scrollDownButtonMesh); scrollDownButtonMesh = null; }
+      answers.forEach(a => scene.remove(a));
+      answers = [];
+      correctCount = 0;
+      wrongCount = 0;
+      gameStartTime = performance.now();
+      gameOver = false;
+      correctResponseTimes = [];
+      countdownStarted = false;
+      gameReady = true;
+      createAnswerObjects(selectedNumAnswers, true);
+      generateQuestion();
+      createScoreDisplay();
+      const timerSound = document.getElementById('timerSound');
+      timerSound.currentTime = 0;
+      timerSound.loop = false;
+      timerSound.play().catch(e=>console.error(e));
+    }
+    
     async function endGame() {
       gameOver = true;
       if(questionMesh) scene.remove(questionMesh);
-      if(questionImageMesh) scene.remove(questionImageMesh);
       if(countdownMesh) scene.remove(countdownMesh);
       if(scoreMesh) scene.remove(scoreMesh);
       answers.forEach(panel => scene.remove(panel));
@@ -857,7 +861,7 @@
       ctx.fillText("Nombre", xPosName, startY);
       ctx.fillText("Puntos", xPosScore, startY);
       let yPos = startY + (1.5 * lineHeight);
-      for(let i = 0; i < subset.length; i++){
+      for(let i=0; i<subset.length; i++){
         const data = subset[i];
         const realPos = data._index + 1;
         if(playerPosition !== null && realPos === playerPosition){
@@ -886,7 +890,7 @@
       scrollDownButtonMesh.position.set(-planeWidth*0.5 - 0.1, -planeHeight*0.35, -1.1);
     }
     
-    /***** 3) RUTINAS PARA LA VERSIÓN HTML (fallback para dispositivos sin AR) *****/
+    /***** 3) RUTINAS PARA LA VERSIÓN HTML (fallback) *****/
     function initHTML() {
       document.body.style.overflow = 'auto';
       htmlMode = true;
@@ -925,7 +929,7 @@
       leaderboardDiv.style.maxWidth = "80%";
       leaderboardDiv.style.maxHeight = "120px";
       leaderboardDiv.style.overflowY = "auto";
-      leaderboardDiv.style.backgroundColor = "#f0f0f0";
+      leaderboardDiv.style.backgroundColor = "#fff";
       leaderboardDiv.style.color = "#000";
       leaderboardDiv.style.fontSize = "12px";
       leaderboardDiv.style.border = "1px solid #000";
@@ -1074,7 +1078,7 @@
         idx++;
       });
       let playerIndex = leaderboardResultsHTML.findIndex(r=> r.name===playerName && r.score===finalScore);
-      let playerPosition = (playerIndex >= 0) ? (playerIndex + 1) : null;
+      let playerPosition = (playerIndex>=0)? (playerIndex+1) : null;
       displayHTMLLeaderboard(leaderboardResultsHTML, playerPosition);
       const gameContainer = document.getElementById('gameContainer');
       const restartBtn = document.createElement('button');
@@ -1135,472 +1139,6 @@
     }
     
     /***** 4) INICIALIZACIÓN: detectar AR y elegir modo *****/
-    function initAR() {
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setClearColor( 0x000000, 0 );
-      renderer.xr.enabled = true;
-      renderer.xr.setReferenceSpaceType('local');
-      document.body.appendChild(renderer.domElement);
-      
-      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-      light.position.set(0.5,1,0.25);
-      scene.add(light);
-      
-      window.addEventListener('resize', onWindowResize, false);
-      
-      // Overlay de menú inicial
-      let overlay = document.createElement('div');
-      overlay.id = 'overlay';
-      overlay.innerHTML =
-        '<img src="ARCalc.jpeg" alt="ARCalculation" style="margin-bottom:30px; margin-top:50px;">' +
-        '<a href="https://www.youtube.com/@rafgim" target="_blank">© By Rafael Gimeno</a>' +
-        '<div class="respuestas-container">' +
-          '<label for="numAnswers">Respuestas:</label>' +
-          '<select id="numAnswers">' +
-            '<option value="4">4</option>' +
-            '<option value="5">5</option>' +
-            '<option value="6">6</option>' +
-            '<option value="7">7</option>' +
-            '<option value="8">8</option>' +
-            '<option value="9">9</option>' +
-            '<option value="10">10</option>' +
-          '</select>' +
-        '</div>' +
-        '<div id="leaderboardPreview"></div>' +
-        '<input type="text" id="playerName" placeholder="Ingresa tu nombre" style="padding:10px; font-size:16px; margin-bottom:20px;" maxlength="10">';
-      
-      (async () => {
-        let arSupported = false;
-        if(navigator.xr){
-          try {
-            arSupported = await navigator.xr.isSessionSupported('immersive-ar');
-          } catch(e){
-            arSupported = false;
-          }
-        }
-        if(arSupported){
-          const arButton = ARButton.createButton(renderer, { requiredFeatures });
-          arButton.style.position = 'absolute';
-          arButton.style.top = '650px';
-          arButton.style.left = 'calc(50% - 75px)';
-          arButton.style.width = '150px';
-          arButton.style.height = '50px';
-          arButton.style.fontSize = '16px';
-          arButton.style.backgroundColor = 'green';
-          arButton.style.color = 'white';
-          overlay.appendChild(arButton);
-          // BOTÓN ADICIONAL: Iniciar versión HTML (para usuarios que prefieran la versión HTML)
-          const htmlButton = document.createElement('button');
-          htmlButton.innerText = "Iniciar versión HTML";
-          htmlButton.style.fontSize = "16px";
-          htmlButton.style.padding = "10px 20px";
-          htmlButton.style.marginTop = "10px";
-          htmlButton.onclick = () => {
-            selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
-            playerName = document.getElementById('playerName').value.trim() || "Jugador";
-            overlay.remove();
-            // Finalizar la sesión XR si existe
-            if (renderer.xr && renderer.xr.getSession()) {
-              renderer.xr.getSession().end().catch(e => console.error(e));
-            }
-            // Eliminar el canvas de AR para que la interfaz HTML se vea
-            if (renderer && renderer.domElement && renderer.domElement.parentNode) {
-              renderer.domElement.parentNode.removeChild(renderer.domElement);
-            }
-            initHTML();
-          };
-          overlay.appendChild(htmlButton);
-        } else {
-          // Si AR no es soportado, se muestra un botón para HTML (ya en el overlay)
-          const startBtn = document.createElement('button');
-          startBtn.innerText = "AR no compatible, Iniciar Juego HTML";
-          startBtn.style.fontSize = '16px';
-          startBtn.style.padding = '10px 20px';
-          startBtn.style.marginTop = '20px';
-          startBtn.onclick = () => {
-            selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
-            playerName = document.getElementById('playerName').value.trim() || "Jugador";
-            overlay.remove();
-            initHTML();
-          };
-          overlay.appendChild(startBtn);
-        }
-        document.body.appendChild(overlay);
-        document.getElementById('numAnswers').addEventListener('change', () => {
-          const num = parseInt(document.getElementById('numAnswers').value) || 4;
-          updateLeaderboardPreview(num);
-        });
-        updateLeaderboardPreview(4);
-        
-        renderer.xr.addEventListener('sessionstart', () => {
-          selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
-          const inputName = document.getElementById('playerName').value;
-          playerName = (inputName !== "") ? inputName : "Jugador";
-          createAnswerObjects(selectedNumAnswers, true);
-          overlay.remove();
-          generateQuestion();
-          createScoreDisplay();
-          gameReady = true;
-          gameStartTime = performance.now();
-          renderer.xr.getSession().addEventListener('select', onSelect);
-        });
-      })();
-    }
-    
-    function onWindowResize() {
-      camera.aspect = window.innerWidth/window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-    
-    // ────────────────────────────────────────────────────────────────
-    // Funciones para mostrar countdown y score en AR
-    function startCountdown() {
-      gameStartTime = performance.now();
-      countdownCanvas = document.createElement('canvas');
-      countdownCanvas.width = 256 * resolutionFactor;
-      countdownCanvas.height = 128 * resolutionFactor;
-      countdownCtx = countdownCanvas.getContext('2d');
-      countdownTexture = new THREE.CanvasTexture(countdownCanvas);
-      countdownTexture.minFilter = THREE.LinearFilter;
-      countdownTexture.magFilter = THREE.LinearFilter;
-      const geometry = new THREE.PlaneGeometry(0.6, 0.3);
-      const material = new THREE.MeshBasicMaterial({ map: countdownTexture, transparent: true });
-      countdownMesh = new THREE.Mesh(geometry, material);
-      countdownMesh.position.set(0, 0.50, -0.82);
-      scene.add(countdownMesh);
-    }
-    
-    function createScoreDisplay() {
-      scoreCanvas = document.createElement('canvas');
-      scoreCanvas.width = 256 * resolutionFactor;
-      scoreCanvas.height = 128 * resolutionFactor;
-      scoreCtx = scoreCanvas.getContext('2d');
-      scoreTexture = new THREE.CanvasTexture(scoreCanvas);
-      scoreTexture.minFilter = THREE.LinearFilter;
-      scoreTexture.magFilter = THREE.LinearFilter;
-      const geometry = new THREE.PlaneGeometry(0.6, 0.3);
-      const material = new THREE.MeshBasicMaterial({ map: scoreTexture, transparent: true });
-      scoreMesh = new THREE.Mesh(geometry, material);
-      scoreMesh.position.set(0, -0.2, -0.82);
-      scene.add(scoreMesh);
-    }
-    
-    function updateCountdown() {
-      const elapsed = (performance.now() - gameStartTime) / 1000;
-      const remaining = Math.max(0, gameDuration - elapsed);
-      const seconds = Math.floor(remaining);
-      countdownCtx.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height);
-      countdownCtx.fillStyle = (remaining <= 10) ? "red" : "#FFFFFF";
-      countdownCtx.font = 'Bold ' + (64 * resolutionFactor) + 'px Arial';
-      countdownCtx.textAlign = "center";
-      countdownCtx.textBaseline = "middle";
-      countdownCtx.fillText(seconds < 10 ? "00:0"+seconds : "00:"+seconds, countdownCanvas.width/2, countdownCanvas.height/2);
-      countdownTexture.needsUpdate = true;
-      if(remaining <= 10 && !beepPlayed) {
-        const beepSound = document.getElementById('beepSound');
-        beepSound.currentTime = 0;
-        beepSound.play().catch(e=>console.error(e));
-        beepPlayed = true;
-      }
-      return remaining;
-    }
-    
-    function updateScoreDisplay() {
-      scoreCtx.clearRect(0, 0, scoreCanvas.width, scoreCanvas.height);
-      scoreCtx.fillStyle = "#FFFFFF";
-      scoreCtx.font = 'Bold ' + (24 * resolutionFactor) + 'px Arial';
-      scoreCtx.textAlign = "center";
-      scoreCtx.textBaseline = "middle";
-      scoreCtx.fillText(`Aciertos: ${correctCount} | Fallos: ${wrongCount}`, scoreCanvas.width/2, scoreCanvas.height/2);
-      scoreTexture.needsUpdate = true;
-    }
-    
-    function animate() {
-      renderer.setAnimationLoop(render);
-    }
-    
-    function render(timestamp, xrFrame) {
-      renderer.render(scene, camera);
-      answers.forEach((mesh, index) => {
-        if(originalAnswerTransforms && originalAnswerTransforms[index]){
-          const baseY = originalAnswerTransforms[index].position.y;
-          mesh.position.y = baseY + 0.02 * Math.sin(timestamp * 0.005 + index);
-        }
-      });
-      
-      if(gameReady && !countdownStarted){
-        startCountdown();
-        const timerSound = document.getElementById('timerSound');
-        timerSound.loop = false;
-        timerSound.play().catch(e=>console.error(e));
-        countdownStarted = true;
-      }
-      
-      const now = performance.now();
-      for(let i = sparksSystems.length - 1; i >= 0; i--){
-        const sys = sparksSystems[i];
-        const dt = (now - sys.lastUpdate) / 1000;
-        sys.lastUpdate = now;
-        const pos = sys.points.geometry.attributes.position.array;
-        for(let j = 0; j < sys.velocities.length; j++){
-          pos[j*3+0] += sys.velocities[j].x * dt;
-          pos[j*3+1] += sys.velocities[j].y * dt;
-          pos[j*3+2] += sys.velocities[j].z * dt;
-        }
-        sys.points.geometry.attributes.position.needsUpdate = true;
-        let life = now - sys.startTime;
-        if(life > 1700){
-          let fadeTime = life - 1700;
-          let fadeFactor = Math.max(0, 1 - (fadeTime/300));
-          sys.points.material.opacity = fadeFactor;
-        }
-        if(life > 2000){
-          scene.remove(sys.points);
-          sparksSystems.splice(i, 1);
-        }
-      }
-      
-      if(!gameOver){
-        const remaining = updateCountdown();
-        updateScoreDisplay();
-        if(remaining <= 0){
-          endGame();
-        }
-      }
-      
-      const session = renderer.xr.getSession();
-      let interactionPoints = [];
-      if(session && xrFrame){
-        for(const inputSource of session.inputSources){
-          if(inputSource.hand){
-            const indexTip = inputSource.hand.get('index-finger-tip');
-            if(indexTip){
-              const jointPose = xrFrame.getJointPose(indexTip, renderer.xr.getReferenceSpace());
-              if(jointPose){
-                interactionPoints.push(new THREE.Vector3(
-                  jointPose.transform.position.x,
-                  jointPose.transform.position.y,
-                  jointPose.transform.position.z
-                ));
-              }
-            }
-          }
-        }
-      }
-      if(interactionPoints.length === 0){
-        let cameraPos = new THREE.Vector3();
-        camera.getWorldPosition(cameraPos);
-        interactionPoints.push(cameraPos);
-      }
-      
-      if(!gameOver){
-        for(let panel of answers){
-          const panelPos = new THREE.Vector3();
-          panel.getWorldPosition(panelPos);
-          for(const pt of interactionPoints){
-            const dist = pt.distanceTo(panelPos);
-            if(dist < collisionThreshold && !hasCollided){
-              hasCollided = true;
-              if(panel.userData.answer === correctAnswer){
-                const responseTime = performance.now() - currentQuestionStartTime;
-                correctResponseTimes.push(responseTime);
-                correctCount++;
-                const successSound = document.getElementById('successSound');
-                const clone = successSound.cloneNode();
-                clone.play().catch(e=>console.error(e));
-                createSparksEffect(panel.position);
-                if(questionMesh) questionMesh.visible = false;
-                if(questionImageMesh) questionImageMesh.visible = false;
-                answers.forEach(a => a.visible = false);
-                setTimeout(()=>{
-                  if(!gameOver){
-                    generateQuestion();
-                    if(questionMesh) questionMesh.visible = true;
-                    if(questionImageMesh) questionImageMesh.visible = true;
-                    answers.forEach(a => a.visible = true);
-                  }
-                  hasCollided = false;
-                }, 1000);
-              } else {
-                wrongCount++;
-                const errorSound = document.getElementById('errorSound');
-                const errorClone = errorSound.cloneNode();
-                errorClone.play().catch(e=>console.error(e));
-                answers.forEach(a => a.material.color.set(0xff0000));
-                setTimeout(()=>{
-                  answers.forEach(a => a.material.color.set(0xffffff));
-                  hasCollided = false;
-                }, 500);
-              }
-              return;
-            }
-          }
-        }
-      }
-    }
-    
-    async function endGame() {
-      gameOver = true;
-      if(questionMesh) scene.remove(questionMesh);
-      if(questionImageMesh) scene.remove(questionImageMesh);
-      if(countdownMesh) scene.remove(countdownMesh);
-      if(scoreMesh) scene.remove(scoreMesh);
-      answers.forEach(panel => scene.remove(panel));
-      
-      let avgTime = 0;
-      if(correctResponseTimes.length > 0){
-        let sum = correctResponseTimes.reduce((a,b)=>a+b,0);
-        avgTime = sum / correctResponseTimes.length / 1000;
-      }
-      const rawScore = (correctCount - wrongCount) - avgTime;
-      const finalScore = parseFloat(rawScore.toFixed(3));
-      const collectionName = `Calcleaderboard_${selectedNumAnswers}`;
-      
-      let docsFound = await getDocs(
-        query(
-          collection(db, collectionName),
-          where("name", "==", playerName),
-          limit(1)
-        )
-      );
-      if(!docsFound.empty){
-        const docToUpdate = docsFound.docs[0];
-        await updateDoc(doc(db, collectionName, docToUpdate.id), {
-          score: finalScore,
-          timestamp: serverTimestamp()
-        });
-      } else {
-        await addDoc(collection(db, collectionName), {
-          name: playerName,
-          score: finalScore,
-          timestamp: serverTimestamp()
-        });
-      }
-      
-      let qLeaderboard = query(
-        collection(db, collectionName),
-        orderBy("score", "desc")
-      );
-      let querySnapshot;
-      try {
-        querySnapshot = await getDocs(qLeaderboard);
-      } catch(err){
-        console.error("Error consultando el leaderboard:", err);
-        return;
-      }
-      leaderboardResults = [];
-      let idx = 0;
-      querySnapshot.forEach(docSnap => {
-        let data = docSnap.data();
-        leaderboardResults.push({ ...data, _index: idx });
-        idx++;
-      });
-      let playerIndex = leaderboardResults.findIndex(r => r.name === playerName && r.score === finalScore);
-      playerPosition = (playerIndex >= 0) ? (playerIndex + 1) : null;
-      scoreboardStartIndex = playerIndex - Math.floor(pageSize/2);
-      if(scoreboardStartIndex < 0) scoreboardStartIndex = 0;
-      if(scoreboardStartIndex >= leaderboardResults.length) scoreboardStartIndex = 0;
-      createLeaderboardMesh();
-      drawLeaderboardSegment();
-    }
-    
-    function createLeaderboardMesh() {
-      if(leaderboardMesh){ scene.remove(leaderboardMesh); leaderboardMesh = null; }
-      if(restartButtonMesh){ scene.remove(restartButtonMesh); restartButtonMesh = null; }
-      if(scrollUpButtonMesh){ scene.remove(scrollUpButtonMesh); scrollUpButtonMesh = null; }
-      if(scrollDownButtonMesh){ scene.remove(scrollDownButtonMesh); scrollDownButtonMesh = null; }
-      
-      const dummyCanvas = document.createElement('canvas');
-      dummyCanvas.width = 512;
-      dummyCanvas.height = 512;
-      const ctx = dummyCanvas.getContext('2d');
-      const lbTexture = new THREE.CanvasTexture(dummyCanvas);
-      lbTexture.minFilter = THREE.LinearFilter;
-      lbTexture.magFilter = THREE.LinearFilter;
-      const planeWidth = 1.2;
-      const planeHeight = 1.0;
-      const lbGeometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
-      const lbMaterial = new THREE.MeshBasicMaterial({ map: lbTexture, transparent: true });
-      leaderboardMesh = new THREE.Mesh(lbGeometry, lbMaterial);
-      leaderboardMesh.userData = { canvas: dummyCanvas, ctx, texture: lbTexture, planeWidth, planeHeight };
-      leaderboardMesh.position.set(0, 0, -1.2);
-      scene.add(leaderboardMesh);
-      
-      restartButtonMesh = createButton("Reiniciar");
-      restartButtonMesh.position.set(0, -planeHeight*0.6, -1.1);
-      scene.add(restartButtonMesh);
-      
-      scrollUpButtonMesh = createButton("▲", 0.1, 0.1);
-      scrollUpButtonMesh.position.set(-planeWidth*0.5 - 0.1, planeHeight*0.35, -1.1);
-      scene.add(scrollUpButtonMesh);
-      
-      scrollDownButtonMesh = createButton("▼", 0.1, 0.1);
-      scrollDownButtonMesh.position.set(-planeWidth*0.5 - 0.1, -planeHeight*0.35, -1.1);
-      scene.add(scrollDownButtonMesh);
-    }
-    
-    function drawLeaderboardSegment() {
-      if(!leaderboardMesh) return;
-      const { canvas, ctx, texture, planeWidth } = leaderboardMesh.userData;
-      const subset = leaderboardResults.slice(scoreboardStartIndex, scoreboardStartIndex+pageSize);
-      const lineHeight = 40 * resolutionFactor;
-      const extraLines = 4;
-      const canvasWidth = 512 * resolutionFactor;
-      const canvasHeight = lineHeight * (subset.length + extraLines);
-      canvas.width = canvasWidth;
-      canvas.height = canvasHeight;
-      ctx.fillStyle = "rgba(0,0,0,0.7)";
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = 'Bold ' + (28 * resolutionFactor) + 'px Arial';
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("Tabla de Clasificación", canvasWidth/2, lineHeight);
-      const xPosPos = 0.10 * canvasWidth;
-      const xPosName = 0.40 * canvasWidth;
-      const xPosScore = 0.75 * canvasWidth;
-      let startY = lineHeight * 2.5;
-      ctx.font = 'Bold ' + (24 * resolutionFactor) + 'px Arial';
-      ctx.textAlign = "left";
-      ctx.fillText("Pos", xPosPos, startY);
-      ctx.fillText("Nombre", xPosName, startY);
-      ctx.fillText("Puntos", xPosScore, startY);
-      let yPos = startY + (1.5 * lineHeight);
-      for(let i = 0; i < subset.length; i++){
-        const data = subset[i];
-        const realPos = data._index + 1;
-        if(playerPosition !== null && realPos === playerPosition){
-          ctx.fillStyle = "green";
-          ctx.fillRect(0, yPos - lineHeight*0.6, canvasWidth, lineHeight);
-          ctx.fillStyle = "#FFFFFF";
-        } else {
-          ctx.fillStyle = "#FFFFFF";
-        }
-        ctx.fillText(String(realPos), xPosPos, yPos);
-        ctx.fillText(data.name, xPosName, yPos);
-        ctx.fillText(String(data.score), xPosScore, yPos);
-        yPos += lineHeight;
-      }
-      if(playerPosition !== null){
-        ctx.textAlign = "center";
-        ctx.fillText(`Tu posición: ${playerPosition}`, canvasWidth/2, yPos+lineHeight);
-      }
-      texture.needsUpdate = true;
-      const planeHeight = planeWidth * (canvasHeight/canvasWidth);
-      leaderboardMesh.geometry.dispose();
-      leaderboardMesh.geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
-      leaderboardMesh.position.set(0, 0, -1.2);
-      restartButtonMesh.position.set(0, -planeHeight*0.6, -1.1);
-      scrollUpButtonMesh.position.set(-planeWidth*0.5 - 0.1, planeHeight*0.35, -1.1);
-      scrollDownButtonMesh.position.set(-planeWidth*0.5 - 0.1, -planeHeight*0.35, -1.1);
-    }
-    
-    /***** 4) INICIALIZACIÓN: detectar AR y elegir modo *****/
     window.addEventListener('DOMContentLoaded', async () => {
       let arSupported = false;
       if(navigator.xr){
@@ -1651,125 +1189,14 @@
     });
     
     // ────────────────────────────────────────────────────────────────
-    // Manejador de eventos "select" para controladores (fallback)
-    function onSelect(event) {
-      const frame = event.frame;
-      const referenceSpace = renderer.xr.getReferenceSpace();
-      const inputSource = event.inputSource;
-      let rayOrigin, rayDirection;
-      
-      if(inputSource.hand) {
-        const indexTip = inputSource.hand.get('index-finger-tip');
-        const wrist = inputSource.hand.get('wrist');
-        if(indexTip && wrist) {
-          const indexTipPose = frame.getJointPose(indexTip, referenceSpace);
-          const wristPose = frame.getJointPose(wrist, referenceSpace);
-          if(indexTipPose && wristPose) {
-            rayOrigin = new THREE.Vector3(
-              wristPose.transform.position.x,
-              wristPose.transform.position.y,
-              wristPose.transform.position.z
-            );
-            const tipPosition = new THREE.Vector3(
-              indexTipPose.transform.position.x,
-              indexTipPose.transform.position.y,
-              indexTipPose.transform.position.z
-            );
-            rayDirection = new THREE.Vector3().subVectors(tipPosition, rayOrigin).normalize();
-          }
-        }
-      } else if(inputSource.targetRaySpace) {
-        const pose = frame.getPose(inputSource.targetRaySpace, referenceSpace);
-        if(pose){
-          const matrix = new THREE.Matrix4().fromArray(pose.transform.matrix);
-          rayOrigin = new THREE.Vector3();
-          const quaternion = new THREE.Quaternion();
-          const scale = new THREE.Vector3();
-          matrix.decompose(rayOrigin, quaternion, scale);
-          rayDirection = new THREE.Vector3(0,0,-1).applyQuaternion(quaternion).normalize();
-        }
-      }
-      
-      if(rayOrigin && rayDirection) {
-        const raycaster = new THREE.Raycaster(rayOrigin, rayDirection);
-        if(gameOver) {
-          const restartIntersects = raycaster.intersectObject(restartButtonMesh, false);
-          if(restartIntersects.length > 0 && !hasCollided) {
-            hasCollided = true;
-            const successSound = document.getElementById('successSound');
-            const clone = successSound.cloneNode();
-            clone.play().catch(e=>console.error(e));
-            createSparksEffect(restartButtonMesh.position);
-            restartButtonMesh.visible = false;
-            setTimeout(() => {
-              restartGame();
-              hasCollided = false;
-            }, 2000);
-            return;
-          }
-          const scrollUpIntersects = raycaster.intersectObject(scrollUpButtonMesh, false);
-          if(scrollUpIntersects.length > 0 && !hasCollided) {
-            hasCollided = true;
-            scoreboardStartIndex = Math.max(0, scoreboardStartIndex - 1);
-            drawLeaderboardSegment();
-            setTimeout(()=> { hasCollided = false; }, 500);
-            return;
-          }
-          const scrollDownIntersects = raycaster.intersectObject(scrollDownButtonMesh, false);
-          if(scrollDownIntersects.length > 0 && !hasCollided) {
-            hasCollided = true;
-            scoreboardStartIndex = Math.min(scoreboardStartIndex + 1, Math.max(0, leaderboardResults.length - pageSize));
-            drawLeaderboardSegment();
-            setTimeout(()=> { hasCollided = false; }, 500);
-            return;
-          }
-        } else {
-          const intersects = raycaster.intersectObjects(answers, false);
-          if(intersects.length > 0 && !hasCollided) {
-            const panel = intersects[0].object;
-            hasCollided = true;
-            if(panel.userData.answer === correctAnswer){
-              const responseTime = performance.now() - currentQuestionStartTime;
-              correctResponseTimes.push(responseTime);
-              correctCount++;
-              const successSound = document.getElementById('successSound');
-              const clone = successSound.cloneNode();
-              clone.play().catch(e=>console.error(e));
-              createSparksEffect(panel.position);
-              if(questionMesh) questionMesh.visible = false;
-              answers.forEach(a => a.visible = false);
-              setTimeout(()=>{
-                if(!gameOver){
-                  generateQuestion();
-                  if(questionMesh) questionMesh.visible = true;
-                  answers.forEach(a => a.visible = true);
-                }
-                hasCollided = false;
-              }, 1000);
-            } else {
-              wrongCount++;
-              const errorSound = document.getElementById('errorSound');
-              const errClone = errorSound.cloneNode();
-              errClone.play().catch(e=>console.error(e));
-              panel.material.color.set(0xff0000);
-              setTimeout(()=>{
-                panel.material.color.set(0xffffff);
-                hasCollided = false;
-              },500);
-            }
-          }
-        }
-      }
-    }
-    
-    // Iniciar AR (o HTML) según soporte
+    // Función initAR: inicializa la escena AR y agrega el overlay con botón extra para HTML
     function initAR() {
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setClearColor( 0x000000, 0 );
+      renderer.setClearColor(0x000000, 0);
       renderer.xr.enabled = true;
       renderer.xr.setReferenceSpaceType('local');
       document.body.appendChild(renderer.domElement);
@@ -1801,81 +1228,65 @@
         '<div id="leaderboardPreview"></div>' +
         '<input type="text" id="playerName" placeholder="Ingresa tu nombre" style="padding:10px; font-size:16px; margin-bottom:20px;" maxlength="10">';
       
-      (async () => {
-        let arSupported = false;
-        if(navigator.xr){
-          try {
-            arSupported = await navigator.xr.isSessionSupported('immersive-ar');
-          } catch(e){
-            arSupported = false;
-          }
+      // Botón AR
+      const arButton = ARButton.createButton(renderer, { requiredFeatures });
+      if(arButton.parentNode){ arButton.parentNode.removeChild(arButton); }
+      arButton.style.position = 'absolute';
+      arButton.style.top = '650px';
+      arButton.style.left = 'calc(50% - 75px)';
+      arButton.style.width = '150px';
+      arButton.style.height = '50px';
+      arButton.style.fontSize = '16px';
+      arButton.style.backgroundColor = 'green';
+      arButton.style.color = 'white';
+      overlay.appendChild(arButton);
+      
+      // ─── BOTÓN EXTRA: Iniciar versión HTML ───
+      const htmlButton = document.createElement('button');
+      htmlButton.innerText = "Iniciar versión HTML";
+      htmlButton.style.fontSize = "16px";
+      htmlButton.style.padding = "10px 20px";
+      htmlButton.style.marginTop = "10px";
+      htmlButton.onclick = () => {
+        selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
+        playerName = document.getElementById('playerName').value.trim() || "Jugador";
+        overlay.remove();
+        // Finalizar sesión XR si existe
+        if(renderer.xr && renderer.xr.getSession()){
+          renderer.xr.getSession().end().catch(e => console.error(e));
         }
-        if(arSupported){
-          const arButton = ARButton.createButton(renderer, { requiredFeatures });
-          arButton.style.position = 'absolute';
-          arButton.style.top = '600px';
-          arButton.style.left = 'calc(50% - 75px)';
-          arButton.style.width = '150px';
-          arButton.style.height = '50px';
-          arButton.style.fontSize = '16px';
-          arButton.style.backgroundColor = 'green';
-          arButton.style.color = 'white';
-          overlay.appendChild(arButton);
-          // BOTÓN ADICIONAL: Iniciar versión HTML
-          const htmlButton = document.createElement('button');
-          htmlButton.innerText = "Iniciar versión HTML";
-          htmlButton.style.fontSize = "16px";
-          htmlButton.style.padding = "10px 20px";
-          htmlButton.style.marginTop = "10px";
-          htmlButton.onclick = () => {
-            selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
-            playerName = document.getElementById('playerName').value.trim() || "Jugador";
-            overlay.remove();
-            if(renderer.xr && renderer.xr.getSession()){
-              renderer.xr.getSession().end().catch(e=>console.error(e));
-            }
-            if(renderer && renderer.domElement && renderer.domElement.parentNode){
-              renderer.domElement.parentNode.removeChild(renderer.domElement);
-            }
-            initHTML();
-          };
-          overlay.appendChild(htmlButton);
-        } else {
-          const startBtn = document.createElement('button');
-          startBtn.innerText = "AR no compatible, Iniciar Juego HTML";
-          startBtn.style.fontSize = '16px';
-          startBtn.style.padding = '10px 20px';
-          startBtn.style.marginTop = '20px';
-          startBtn.onclick = () => {
-            selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
-            playerName = document.getElementById('playerName').value.trim() || "Jugador";
-            overlay.remove();
-            initHTML();
-          };
-          overlay.appendChild(startBtn);
+        // Remover el canvas de AR
+        if(renderer && renderer.domElement && renderer.domElement.parentNode){
+          renderer.domElement.parentNode.removeChild(renderer.domElement);
         }
-        document.body.appendChild(overlay);
-        document.getElementById('numAnswers').addEventListener('change', () => {
-          const num = parseInt(document.getElementById('numAnswers').value) || 4;
-          updateLeaderboardPreview(num);
-        });
-        updateLeaderboardPreview(4);
-        
-        renderer.xr.addEventListener('sessionstart', () => {
-          selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
-          const inputName = document.getElementById('playerName').value;
-          playerName = (inputName !== "") ? inputName : "Jugador";
-          createAnswerObjects(selectedNumAnswers, true);
-          overlay.remove();
-          generateQuestion();
-          createScoreDisplay();
-          gameReady = true;
-          gameStartTime = performance.now();
-          renderer.xr.getSession().addEventListener('select', onSelect);
-        });
-      })();
+        initHTML();
+      };
+      overlay.appendChild(htmlButton);
+      
+      document.body.appendChild(overlay);
+      
+      document.getElementById('numAnswers').addEventListener('change', () => {
+        const num = parseInt(document.getElementById('numAnswers').value) || 4;
+        updateLeaderboardPreview(num);
+      });
+      updateLeaderboardPreview(4);
+      
+      renderer.xr.addEventListener('sessionstart', () => {
+        selectedNumAnswers = parseInt(document.getElementById('numAnswers').value) || 4;
+        const inputName = document.getElementById('playerName').value;
+        playerName = (inputName !== "") ? inputName : "Jugador";
+        createAnswerObjects(selectedNumAnswers, true);
+        overlay.remove();
+        generateQuestion();
+        createScoreDisplay();
+        gameReady = true;
+        gameStartTime = performance.now();
+        renderer.xr.getSession().addEventListener('select', onSelect);
+      });
     }
     
+    // ────────────────────────────────────────────────────────────────
+    // Iniciar AR y animar
     initAR();
     animate();
   </script>
